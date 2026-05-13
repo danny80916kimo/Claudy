@@ -1,5 +1,7 @@
 # Claudy
 
+[繁體中文版](README.zh-TW.md)
+
 A Claude Code status mascot for the **LilyGo T-Display-S3** (ESP32-S3, 1.9" 170×320 ST7789).
 
 Claude Code hook events on your Mac are pushed via HTTP to the ESP32, which renders a procedurally-drawn Claude mascot that reacts to what Claude is doing — Idle / Thinking / Working / Waiting / Error / Done — plus a context-token progress bar.

@@ -1,0 +1,16 @@
+# Build artifacts
+build/
+*.bin
+*.elf
+*.map
+
+# Firmware secrets
+firmware/config.h
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+*.swp
+*.swo
