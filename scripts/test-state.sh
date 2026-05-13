@@ -2,8 +2,29 @@
 # Cycle through all states to verify the display rendering on the device.
 set -euo pipefail
 
-URL="${CLAUDY_URL:-http://claudy.local/state}"
+RAW_URL="${CLAUDY_URL:-http://claudy.local/state}"
 AUTH="${CLAUDY_TOKEN:-}"
+IP_CACHE="$HOME/.claude/claudy_ip_cache"
+
+# Reuse the IP cache from send_state.py so we don't depend on flaky system mDNS.
+resolve_url() {
+  local url="$1"
+  case "$url" in
+    *".local"*)
+      if [ -f "$IP_CACHE" ] && [ $(( $(date +%s) - $(stat -f %m "$IP_CACHE") )) -lt 60 ]; then
+        local ip
+        ip=$(cat "$IP_CACHE")
+        if [ -n "$ip" ]; then
+          echo "$url" | sed "s|://[^:/]*|://$ip|"
+          return
+        fi
+      fi
+      ;;
+  esac
+  echo "$url"
+}
+
+URL="$(resolve_url "$RAW_URL")"
 
 send() {
   local payload="$1"
