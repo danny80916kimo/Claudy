@@ -1,0 +1,12 @@
+default_profile: tdisplay_s3
+
+profiles:
+  tdisplay_s3:
+    # Stock arduino-esp32 core doesn't ship a "lilygo_t_display_s3" variant —
+    # we use the generic esp32s3 entry with the menu options the board needs.
+    fqbn: esp32:esp32:esp32s3:USBMode=default,CDCOnBoot=default,FlashSize=16M,FlashMode=qio,PartitionScheme=app3M_fat9M_16MB,LoopCore=1,EventsCore=1,PSRAM=opi,CPUFreq=240,UploadSpeed=921600,DebugLevel=none
+    platforms:
+      - platform: esp32:esp32 (3.0.7)
+    libraries:
+      - LovyanGFX (1.1.16)
+      - ArduinoJson (7.1.0)

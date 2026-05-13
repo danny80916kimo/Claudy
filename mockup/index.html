@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Claudy layout mockup</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    background: #0e0e10;
+    color: #ddd;
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    margin: 0;
+    padding: 24px;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h3 { font-size: 12px; color: #888; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+  p.hint { color: #888; max-width: 720px; margin: 0 0 18px; }
+  .stage {
+    background: #000;
+    padding: 16px;
+    border-radius: 10px;
+    display: inline-block;
+    box-shadow: 0 0 0 1px #222;
+  }
+  canvas {
+    display: block;
+    background: #000;
+    image-rendering: pixelated;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 28px;
+    max-width: 1280px;
+    margin-top: 12px;
+  }
+  .panel {
+    background: #161618;
+    border: 1px solid #222;
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  label { color: #aaa; min-width: 110px; font-size: 12px; }
+  input[type=range] { flex: 1; }
+  input[type=text], input[type=number], select, textarea {
+    background: #0c0c0e; color: #e6e6e6; border: 1px solid #2a2a2e;
+    padding: 4px 6px; border-radius: 4px; font: inherit;
+  }
+  input[type=text] { width: 100%; }
+  textarea { width: 100%; min-height: 40px; resize: vertical; }
+  .val { color: #ccc; min-width: 36px; text-align: right; font-variant-numeric: tabular-nums; }
+  button {
+    background: #2a2a2e; color: #eee; border: 1px solid #3a3a3e;
+    padding: 6px 10px; border-radius: 5px; cursor: pointer;
+  }
+  button:hover { background: #34343a; }
+  pre.export {
+    background: #08080a; color: #b0b0b0; padding: 10px 12px;
+    border-radius: 5px; font: 11px/1.5 ui-monospace, Menlo, monospace;
+    white-space: pre-wrap; max-height: 200px; overflow: auto;
+    border: 1px solid #1a1a1e;
+  }
+</style>
+</head>
+<body>
+
+<h1>Claudy layout mockup</h1>
+<p class="hint">
+  Pixel-faithful 320×170 render, scaled 3×. Same RGB565 colors, same mascot grid,
+  same animation timing as the firmware. Tweak the sliders to find a layout you like;
+  hit "Export" to get values to drop back into <code>display.cpp</code>.
+</p>
+
+<div class="layout">
+  <div>
+    <div class="stage">
+      <canvas id="cv" width="960" height="510"></canvas>
+    </div>
+  </div>
+
+  <div class="panel">
+
+    <h3>State</h3>
+    <div class="row">
+      <label>State</label>
+      <select id="state">
+        <option value="idle">idle</option>
+        <option value="thinking">thinking</option>
+        <option value="working" selected>working</option>
+        <option value="waiting">waiting</option>
+        <option value="error">error</option>
+        <option value="done">done</option>
+        <option value="boot">boot</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Tool</label>
+      <select id="tool">
+        <option value="">(none)</option>
+        <option value="Read">Read</option>
+        <option value="Edit">Edit</option>
+        <option value="Write">Write</option>
+        <option value="Bash" selected>Bash</option>
+        <option value="Grep">Grep</option>
+        <option value="WebFetch">WebFetch</option>
+        <option value="Task">Task</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Message</label>
+      <input id="msg" type="text" value="npm run build && deploy">
+    </div>
+    <div class="row">
+      <label>Tokens used</label>
+      <input id="used" type="range" min="0" max="1000000" step="1000" value="237600">
+      <span class="val" id="usedLbl">237k</span>
+    </div>
+    <div class="row">
+      <label>Tokens max</label>
+      <select id="max">
+        <option value="200000">200k</option>
+        <option value="1000000" selected>1M</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Animate</label>
+      <input id="anim" type="checkbox" checked>
+    </div>
+
+    <h3>Padding & regions</h3>
+    <div class="row"><label>Padding</label>
+      <input id="pad" type="range" min="0" max="30" value="12"><span class="val" id="padLbl">12</span></div>
+    <div class="row"><label>Mascot width</label>
+      <input id="mw" type="range" min="80" max="200" value="132"><span class="val" id="mwLbl">132</span></div>
+    <div class="row"><label>Gap</label>
+      <input id="gap" type="range" min="0" max="30" value="12"><span class="val" id="gapLbl">12</span></div>
+    <div class="row"><label>Mascot pixel</label>
+      <input id="mpx" type="range" min="6" max="16" value="12"><span class="val" id="mpxLbl">12</span></div>
+
+    <h3>Fonts</h3>
+    <div class="row"><label>State size</label>
+      <input id="stateSize" type="range" min="14" max="36" value="24"><span class="val" id="stateSizeLbl">24</span></div>
+    <div class="row"><label>Tool size</label>
+      <input id="toolSize" type="range" min="9" max="18" value="13"><span class="val" id="toolSizeLbl">13</span></div>
+    <div class="row"><label>Message size</label>
+      <input id="msgSize" type="range" min="9" max="18" value="14"><span class="val" id="msgSizeLbl">14</span></div>
+    <div class="row"><label>Percent size</label>
+      <input id="pctSize" type="range" min="14" max="36" value="22"><span class="val" id="pctSizeLbl">22</span></div>
+    <div class="row"><label>Detail size</label>
+      <input id="detSize" type="range" min="8" max="16" value="11"><span class="val" id="detSizeLbl">11</span></div>
+
+    <h3>Positioning</h3>
+    <div class="row"><label>State Y</label>
+      <input id="stateY" type="range" min="-10" max="30" value="0"><span class="val" id="stateYLbl">0</span></div>
+    <div class="row"><label>Chip Y</label>
+      <input id="chipY" type="range" min="20" max="80" value="36"><span class="val" id="chipYLbl">36</span></div>
+    <div class="row"><label>Chip width</label>
+      <input id="chipW" type="range" min="22" max="50" value="28"><span class="val" id="chipWLbl">28</span></div>
+    <div class="row"><label>Chip height</label>
+      <input id="chipH" type="range" min="16" max="32" value="20"><span class="val" id="chipHLbl">20</span></div>
+    <div class="row"><label>Msg gap</label>
+      <input id="msgGap" type="range" min="0" max="20" value="4"><span class="val" id="msgGapLbl">4</span></div>
+    <div class="row"><label>Bar height</label>
+      <input id="barH" type="range" min="3" max="14" value="6"><span class="val" id="barHLbl">6</span></div>
+    <div class="row"><label>Bar Y offset</label>
+      <input id="barYoff" type="range" min="-30" max="30" value="-16"><span class="val" id="barYoffLbl">-16</span></div>
+
+    <h3>Export</h3>
+    <div class="row">
+      <button id="exportBtn">Export layout</button>
+      <button id="resetBtn">Reset defaults</button>
+    </div>
+    <pre class="export" id="exportOut">(click Export)</pre>
+
+  </div>
+</div>
+
+<script>
+// ────── RGB565 → CSS color (matches firmware exactly) ──────
+function c565(v) {
+  const r = ((v >> 11) & 0x1F) << 3;
+  const g = ((v >> 5)  & 0x3F) << 2;
+  const b = ( v        & 0x1F) << 3;
+  return `rgb(${r},${g},${b})`;
+}
+
+const COL = {
+  ORANGE: c565(0xCC2D),
+  DARK:   c565(0x1082),
+  DIM:    c565(0x4208),
+  THINK:  c565(0x7E5F),
+  WORK:   c565(0x05FF),
+  WAIT:   c565(0xFEC0),
+  ERROR:  c565(0xF820),
+  DONE:   c565(0x07E5),
+  TOK_BG: c565(0x4A49),
+  TOK_OK: c565(0x06DF),
+  TOK_HI: c565(0xFD20),
+  TOK_RED:c565(0xF800),
+  DETAIL: c565(0x8C71),
+  MSG:    c565(0xBDF7),
+};
+
+// ────── Mascot pixel grids ──────
+const GRID_OPEN = [
+  " ######### ",
+  "###########",
+  "###########",
+  "###.###.###",
+  "###########",
+  "###########",
+  "###########",
+  " ##     ## ",
+  " ##     ## ",
+];
+const GRID_BLINK = [
+  " ######### ",
+  "###########",
+  "###########",
+  "###########",
+  "###########",
+  "###########",
+  "###########",
+  " ##     ## ",
+  " ##     ## ",
+];
+const GRID_SQUINT = [
+  " ######### ",
+  "###########",
+  "###.###.###",
+  "###########",
+  "###########",
+  "###########",
+  "###########",
+  " ##     ## ",
+  " ##     ## ",
+];
+const GRID_X = [
+  " ######### ",
+  "###########",
+  "###.###.###",
+  "###.###.###",
+  "###########",
+  "###########",
+  "###########",
+  " ##     ## ",
+  " ##     ## ",
+];
+
+// ────── Setup ──────
+const cv  = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+const W = 320, H = 170;
+const SCALE = 3;
+cv.width  = W * SCALE;
+cv.height = H * SCALE;
+
+// Cache slider element references
+const inputs = {};
+for (const id of [
+  'state','tool','msg','used','max','anim',
+  'pad','mw','gap','mpx',
+  'stateSize','toolSize','msgSize','pctSize','detSize',
+  'stateY','chipY','chipW','chipH','msgGap','barH','barYoff',
+]) inputs[id] = document.getElementById(id);
+
+const labels = {};
+for (const id of [
+  'used','pad','mw','gap','mpx',
+  'stateSize','toolSize','msgSize','pctSize','detSize',
+  'stateY','chipY','chipW','chipH','msgGap','barH','barYoff',
+]) labels[id] = document.getElementById(id + 'Lbl');
+
+const DEFAULTS = {};
+for (const id of Object.keys(inputs)) {
+  if (inputs[id].type === 'checkbox') DEFAULTS[id] = inputs[id].checked;
+  else DEFAULTS[id] = inputs[id].value;
+}
+
+function updateLabels() {
+  if (labels.used) {
+    const u = +inputs.used.value;
+    labels.used.textContent = u >= 1000 ? (u/1000).toFixed(0) + 'k' : u;
+  }
+  for (const id of Object.keys(labels)) {
+    if (id === 'used') continue;
+    labels[id].textContent = inputs[id].value;
+  }
+}
+
+// ────── Drawing helpers ──────
+function fillRect(x, y, w, h, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+}
+function fillRoundRect(x, y, w, h, r, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.roundRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h), r);
+  ctx.fill();
+}
+function drawRoundRect(x, y, w, h, r, color) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(Math.round(x)+0.5, Math.round(y)+0.5, Math.round(w)-1, Math.round(h)-1, r);
+  ctx.stroke();
+}
+
+// ────── Mascot ──────
+function drawMascot(state, x, y, w, h, t, px) {
+  const cx = x + w/2;
+  const cy = y + h/2;
+  let dx = 0, dy = 0;
+  let body = COL.ORANGE;
+  let eye  = COL.DARK;
+  let grid = GRID_OPEN;
+  switch (state) {
+    case 'idle':
+      dy = Math.sin(t/1500 * 2*Math.PI) * 2;
+      if (t % 3500 < 150) grid = GRID_BLINK;
+      break;
+    case 'thinking':
+      dy = Math.sin(t/700 * 2*Math.PI) * 1.5;
+      grid = GRID_SQUINT;
+      body = COL.THINK;
+      break;
+    case 'working':
+      dy = Math.sin(t/250 * 2*Math.PI) * 1.5;
+      dx = Math.sin(t/500 * 2*Math.PI) * 1.0;
+      body = COL.WORK;
+      break;
+    case 'waiting':
+      dy = -Math.abs(Math.sin(t/900 * 2*Math.PI)) * 3;
+      body = COL.WAIT;
+      break;
+    case 'error':
+      dx = Math.sin(t/50 * 2*Math.PI) * 4;
+      grid = GRID_X;
+      body = COL.ERROR;
+      break;
+    case 'done':
+      dy = -Math.abs(Math.sin(t/350 * 2*Math.PI)) * 5;
+      body = COL.DONE;
+      if (t % 700 < 100) grid = GRID_BLINK;
+      break;
+    case 'boot':
+      body = COL.DIM;
+      break;
+  }
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const x0 = cx - cols*px/2 + dx;
+  const y0 = cy - rows*px/2 + dy;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const ch = grid[r][c];
+      if (ch === '#')      fillRect(x0 + c*px, y0 + r*px, px, px, body);
+      else if (ch === '.') fillRect(x0 + c*px, y0 + r*px, px, px, eye);
+    }
+  }
+}
+
+// ────── Tool badge ──────
+function drawToolBadge(x, y, w, h, tool, fontPx) {
+  if (!tool) return;
+  let glyph = '?'; let bg = c565(0x39E7);
+  switch (tool) {
+    case 'Read':     glyph = 'R'; bg = c565(0x3475); break;
+    case 'Edit':     glyph = 'E'; bg = c565(0xC9A0); break;
+    case 'Write':    glyph = 'W'; bg = c565(0xCAA0); break;
+    case 'Bash':     glyph = '$'; bg = c565(0x39E7); break;
+    case 'Grep':     glyph = 'G'; bg = c565(0x4A89); break;
+    case 'WebFetch': glyph = '@'; bg = c565(0x2C9F); break;
+    case 'Task':     glyph = 'T'; bg = c565(0x880F); break;
+  }
+  fillRoundRect(x, y, w, h, 4, bg);
+  ctx.fillStyle = '#fff';
+  ctx.font = `bold ${fontPx}px -apple-system, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(glyph, x + w/2, y + h/2 + 1);
+}
+
+// ────── Token bar ──────
+function drawTokenBar(x, y, w, h, used, max) {
+  drawRoundRect(x, y, w, h, 3, COL.TOK_BG);
+  if (max <= 0) return;
+  let fill = (w - 4) * used / max;
+  if (fill > w - 4) fill = w - 4;
+  const pct = used * 100 / max;
+  let col = COL.TOK_OK;
+  if (pct > 75) col = COL.TOK_HI;
+  if (pct > 90) col = COL.TOK_RED;
+  fillRoundRect(x + 2, y + 2, fill, h - 4, 2, col);
+}
+
+// ────── Main render ──────
+function render(t) {
+  ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  const PAD = +inputs.pad.value;
+  const mw  = +inputs.mw.value;
+  const gap = +inputs.gap.value;
+  const mpx = +inputs.mpx.value;
+
+  // Mascot
+  drawMascot(inputs.state.value, PAD, PAD, mw, H - 2*PAD, t, mpx);
+
+  // Right column
+  const tx = PAD + mw + gap;
+  const ty = PAD;
+  const tw = W - tx - PAD;
+  const th = H - 2*PAD;
+
+  // State name
+  ctx.fillStyle = '#fff';
+  ctx.font = `bold ${+inputs.stateSize.value}px -apple-system, sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  const stateLabel = inputs.state.value[0].toUpperCase() + inputs.state.value.slice(1);
+  ctx.fillText(stateLabel, tx, ty + +inputs.stateY.value);
+
+  // Tool chip
+  let cursorY = ty + +inputs.chipY.value;
+  const tool = inputs.tool.value;
+  const chipW = +inputs.chipW.value;
+  const chipH = +inputs.chipH.value;
+  if (tool) {
+    drawToolBadge(tx, cursorY, chipW, chipH, tool, +inputs.toolSize.value);
+    ctx.fillStyle = COL.MSG;
+    ctx.font = `${+inputs.toolSize.value}px -apple-system, sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(tool, tx + chipW + 6, cursorY + chipH/2 + 1);
+    cursorY += chipH + +inputs.msgGap.value;
+  } else {
+    cursorY += +inputs.msgGap.value;
+  }
+
+  // Message (wrapped, up to 2 lines)
+  ctx.fillStyle = COL.MSG;
+  ctx.font = `${+inputs.msgSize.value}px -apple-system, sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  {
+    const text = inputs.msg.value;
+    const words = text.split(/\s+/);
+    const lineH = +inputs.msgSize.value + 4;
+    let line = '';
+    let lines = [];
+    for (const w of words) {
+      const test = line ? line + ' ' + w : w;
+      if (ctx.measureText(test).width > tw && line) {
+        lines.push(line);
+        line = w;
+      } else {
+        line = test;
+      }
+      if (lines.length >= 2) break;
+    }
+    if (line && lines.length < 2) lines.push(line);
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], tx, cursorY + i * lineH);
+    }
+  }
+
+  // Token area
+  const used = +inputs.used.value;
+  const max  = +inputs.max.value;
+  if (max > 0) {
+    const pct = Math.floor(used * 100 / max);
+    const pctStr = pct + '%';
+    const pctSize = +inputs.pctSize.value;
+    const detSize = +inputs.detSize.value;
+    const barH    = +inputs.barH.value;
+    const barYoff = +inputs.barYoff.value;
+    const pctY = ty + th;
+
+    // big percentage, right-aligned
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${pctSize}px -apple-system, sans-serif`;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    const pctWidth = ctx.measureText(pctStr).width;
+    ctx.fillText(pctStr, tx + tw, pctY);
+
+    // detail text (small)
+    ctx.fillStyle = COL.DETAIL;
+    ctx.font = `${detSize}px -apple-system, sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    let detail;
+    if (max >= 1000000) {
+      detail = `${(used/1000).toFixed(1)}k / 1M`;
+    } else {
+      detail = `${Math.floor(used/1000)}k / ${Math.floor(max/1000)}k`;
+    }
+    ctx.fillText(detail, tx, pctY - pctSize - 4);
+
+    // bar
+    const barY = pctY + barYoff;
+    const barW = tw - pctWidth - 8;
+    drawTokenBar(tx, barY, barW, barH, used, max);
+  }
+}
+
+// ────── Animation loop ──────
+const t0 = performance.now();
+function tick() {
+  const t = performance.now() - t0;
+  render(t);
+  if (inputs.anim.checked) requestAnimationFrame(tick);
+}
+
+// Re-render on any input change (and start/stop animation toggle)
+for (const id of Object.keys(inputs)) {
+  inputs[id].addEventListener('input', () => {
+    updateLabels();
+    if (!inputs.anim.checked) render(performance.now() - t0);
+    else if (id === 'anim') tick();
+  });
+}
+
+// ────── Export ──────
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const v = id => inputs[id].value;
+  const out = `// Drop these constants into renderFrame() in display.cpp
+const int PAD       = ${v('pad')};
+const int MASCOT_W  = ${v('mw')};
+const int GAP       = ${v('gap')};
+const int MASCOT_PX = ${v('mpx')};      // pixel size of the mascot's pixel-art grid
+
+// Fonts (mapped to LovyanGFX FreeFonts by visual size):
+//   ${v('stateSize')}px ≈ FreeSansBold18pt7b   (state name)
+//   ${v('toolSize')}px ≈ FreeSans9pt7b         (tool label)
+//   ${v('msgSize')}px ≈ FreeSans9pt7b          (message)
+//   ${v('pctSize')}px ≈ FreeSansBold12pt7b     (percent)
+//   ${v('detSize')}px ≈ Font2                  (detail)
+
+const int STATE_Y   = ${v('stateY')};
+const int CHIP_Y    = ${v('chipY')};
+const int CHIP_W    = ${v('chipW')};
+const int CHIP_H    = ${v('chipH')};
+const int MSG_GAP   = ${v('msgGap')};
+const int BAR_H     = ${v('barH')};
+const int BAR_YOFF  = ${v('barYoff')};
+`;
+  document.getElementById('exportOut').textContent = out;
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  for (const id of Object.keys(DEFAULTS)) {
+    if (inputs[id].type === 'checkbox') inputs[id].checked = DEFAULTS[id];
+    else inputs[id].value = DEFAULTS[id];
+  }
+  updateLabels();
+  if (!inputs.anim.checked) render(performance.now() - t0);
+});
+
+updateLabels();
+tick();
+</script>
+</body>
+</html>
