@@ -79,13 +79,14 @@ default_profile: esp32c6_amoled
 
 profiles:
   esp32c6_amoled:
-    fqbn: esp32:esp32:esp32c6:USBMode=hwcdc,CDCOnBoot=cdc,FlashSize=16M,FlashMode=qio,PartitionScheme=app3M_fat9M_16MB,CPUFreq=160,UploadSpeed=921600,DebugLevel=none
+    fqbn: esp32:esp32:esp32c6:CDCOnBoot=cdc,FlashSize=16M,FlashMode=qio,PartitionScheme=app3M_fat9M_16MB,CPUFreq=160,UploadSpeed=921600,DebugLevel=none
     platforms:
       - platform: esp32:esp32 (3.0.7)
     libraries:
-      - lvgl (8.3.11)
       - ArduinoJson (7.1.0)
 ```
+
+> The ESP32-C6 in arduino-esp32 core 3.0.7 has only USB-Serial-JTAG (no USB OTG), so no `USBMode` menu option exists — `CDCOnBoot=cdc` alone gives native-USB-CDC. `lvgl (8.3.11)` is intentionally NOT in libraries yet; arduino-cli would pull LVGL sources in and fail without `lv_conf.h`. Task 5 adds `lvgl (8.3.11)` to this list once `lv_conf.h` is created.
 
 - [ ] **Step 1.2: Create `firmware-c6/.gitignore`**
 
@@ -161,7 +162,7 @@ if [ ! -f "$SKETCH/config.h" ]; then
   exit 1
 fi
 
-FQBN="esp32:esp32:esp32c6:USBMode=hwcdc,CDCOnBoot=cdc,FlashSize=16M,FlashMode=qio,PartitionScheme=app3M_fat9M_16MB,CPUFreq=160,UploadSpeed=921600,DebugLevel=none"
+FQBN="esp32:esp32:esp32c6:CDCOnBoot=cdc,FlashSize=16M,FlashMode=qio,PartitionScheme=app3M_fat9M_16MB,CPUFreq=160,UploadSpeed=921600,DebugLevel=none"
 
 echo "==> Compiling $SKETCH"
 arduino-cli compile \
@@ -199,7 +200,7 @@ if [ -z "$PORT" ]; then
   exit 1
 fi
 
-FQBN="esp32:esp32:esp32c6:USBMode=hwcdc,CDCOnBoot=cdc,FlashSize=16M,FlashMode=qio,PartitionScheme=app3M_fat9M_16MB,CPUFreq=160,UploadSpeed=921600,DebugLevel=none"
+FQBN="esp32:esp32:esp32c6:CDCOnBoot=cdc,FlashSize=16M,FlashMode=qio,PartitionScheme=app3M_fat9M_16MB,CPUFreq=160,UploadSpeed=921600,DebugLevel=none"
 
 echo "==> Uploading to $PORT"
 arduino-cli upload \
@@ -794,7 +795,19 @@ git commit -m "firmware-c6: CO5300 init via vendored Waveshare BSP; G3 solid-col
 
 **Goal:** LVGL initialized with two partial draw buffers (each 480×48 RGB565 = 46KB). A label "Hello, Claudy" renders centered.
 
-- [ ] **Step 5.1: Create `firmware-c6/lv_conf.h`**
+- [ ] **Step 5.1: Add LVGL to `firmware-c6/sketch.yaml` libraries**
+
+Edit `firmware-c6/sketch.yaml`. In the `libraries:` list, add `lvgl (8.3.11)` so it becomes:
+
+```yaml
+    libraries:
+      - lvgl (8.3.11)
+      - ArduinoJson (7.1.0)
+```
+
+This entry was intentionally omitted in Task 1 because arduino-cli would compile LVGL sources and fail without `lv_conf.h`. We add `lv_conf.h` in the next step.
+
+- [ ] **Step 5.1b: Create `firmware-c6/lv_conf.h`**
 
 LVGL requires this file at the sketch root. Copy `lv_conf_template.h` from the LVGL library install path:
 
