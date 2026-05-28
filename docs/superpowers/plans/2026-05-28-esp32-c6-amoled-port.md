@@ -650,6 +650,8 @@ git commit -m "firmware-c6: AXP2101 brings up LCD power rails; G2 passes (CST922
 
 > **Reference:** The init sequence + esp_lcd panel callbacks for CO5300 live in `02_Example/Arduino-v3.3.3/08_LVGL_V8_Test/bsp_lvgl_port.cpp` and headers in `02_Example/Arduino-v3.3.3/08_LVGL_V8_Test/src/externLib/` in the Waveshare repo. **Copy that init command array and the QSPI setup code verbatim** at first. Refactor only after Gate G3 passes — the init sequence is undocumented and contains panel-specific magic. Don't try to derive it.
 
+> **Known constraint from Task 3:** ALDO3 is the LCD VCI rail. Waveshare's reference performs an off/on/off pulse on ALDO3 before sending CO5300 init commands. Task 3's `pmic_init()` leaves ALDO3 enabled (no reset pulse). If the display stays black at Gate G3, the most likely cause is the missing reset pulse — add a `pmic_pulse_aldo3()` helper to `pmic_axp2101.{h,cpp}` (writes register 0x90 bit 2 = 0, delays 100ms, = 1, delays 100ms) and call it before `co5300_init()`. The vendored Waveshare BSP may handle this internally; only add the helper if it doesn't.
+
 - [ ] **Step 4.1: Vendor the Waveshare CO5300 init sequence**
 
 ```bash
