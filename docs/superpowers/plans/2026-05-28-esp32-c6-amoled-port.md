@@ -221,21 +221,28 @@ chmod +x scripts/flash-c6.sh
 ```bash
 #!/bin/bash
 set -euo pipefail
+
 PORT="${1:-}"
 if [ -z "$PORT" ]; then
   PORT=$(ls /dev/cu.usbmodem* 2>/dev/null | head -1 || true)
+  if [ -z "$PORT" ]; then
+    PORT=$(ls /dev/cu.usbserial-* 2>/dev/null | head -1 || true)
+  fi
 fi
 if [ -z "$PORT" ]; then
   echo "No serial port found."
   exit 1
 fi
-echo "==> Monitoring $PORT @ 115200 (Ctrl-A K to quit screen)"
-exec screen "$PORT" 115200
+
+echo "==> Monitoring $PORT  (Ctrl-C to quit)"
+arduino-cli monitor -p "$PORT" -c baudrate=115200
 ```
 
 ```bash
 chmod +x scripts/monitor-c6.sh
 ```
+
+(Matches `scripts/monitor.sh` — same port-detection logic, same `arduino-cli monitor` to avoid `screen` holding the port and blocking the next `flash-c6.sh`.)
 
 - [ ] **Step 1.9: Update `scripts/setup.sh`** — add LVGL install. Find the line:
 
