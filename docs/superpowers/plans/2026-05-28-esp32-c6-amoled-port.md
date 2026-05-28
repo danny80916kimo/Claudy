@@ -615,13 +615,20 @@ AXP2101: LCD power rails enabled
 I2C scan:
   found device at 0x34
   found device at 0x51
-  found device at 0x5A     <-- CST9220 now powered
+  found device at 0x5A     <-- CST9220 (NOTE: may already appear pre-init on this board variant)
   found device at 0x6B
 I2C scan: 4 device(s) found
 Battery: 0 mV               <-- or actual voltage if battery is fitted
 ```
 
-**Gate G2 passes if scan #2 includes 0x5A and the display backlight (if any visible test pattern from prior firmware) flickers / changes when the rails come up.** If 0x5A still missing: verify the AXP2101 register values against the Waveshare reference (Step 3.1 note).
+**Gate G2 passes if:**
+- `pmic_init()` returns `true` (AXP2101 still responds at 0x34 after the LDO register writes)
+- No serial crash or I2C error
+- Scan #2 looks reasonable (the documented devices still present)
+
+**Note:** Empirically (verified on this exact board) CST9220 (0x5A) is already on the I2C bus *before* PMIC init — its rail is not gated through AXP2101 on this board variant. The board also has an ES8311 audio codec at 0x18, an ES7210 mic ADC at 0x40, and what's almost certainly a CST9220 bootloader interface at 0x7E. None of these affect this task.
+
+The *real* proof that PMIC init enabled the LCD power rails comes at Gate G3 (solid color test) — if the CO5300 responds and displays pixels, the rails are alive. Task 3 only verifies that we didn't break the I2C bus by writing the AXP registers.
 
 - [ ] **Step 3.5: Commit**
 
