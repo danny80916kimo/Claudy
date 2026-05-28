@@ -24,24 +24,26 @@ firmware-c6/
   sketch.yaml                      # Arduino CLI profile
   config.h.example
   config.h                         # gitignored
+  lv_conf.h                        # LVGL config (added in Task 5; must be at sketch root)
   state.h                          # COPIED VERBATIM from firmware/state.h
 
-  hw/
-    pins.h                         # All GPIO defines
-    i2c_bus.h, i2c_bus.cpp         # Shared I2C bus wrapper (Wire-based)
-    pmic_axp2101.h, .cpp           # AXP2101 PMIC: init + LCD rail enable + brightness API
-    co5300.h, .cpp                 # CO5300 QSPI driver: esp_lcd_panel handle + init seq
-    touch_cst9220.h, .cpp          # CST9220 I2C touch reader; ISR on INT pin
+  src/                             # Arduino only recurses .cpp under src/ — modules live here
+    hw/
+      pins.h                       # All GPIO defines
+      i2c_bus.h, i2c_bus.cpp       # Shared I2C bus wrapper (Wire-based)
+      pmic_axp2101.h, .cpp         # AXP2101 PMIC: init + LCD rail enable + brightness API
+      co5300.h, .cpp               # CO5300 QSPI driver: esp_lcd_panel handle + init seq
+      touch_cst9220.h, .cpp        # CST9220 I2C touch reader; ISR on INT pin
 
-  ui/
-    lvgl_port.h, .cpp              # LVGL init: display flush_cb + indev cb + tick + lock
-    theme.h                        # Color constants (RGB565), fonts, layout dimensions
-    gfx.h, .cpp                    # Thin facade: gfx_fill_rect/circle/line over lv_canvas
-    mascot.h, .cpp                 # Ported from firmware/mascot.cpp, uses gfx facade
-    ui.h, .cpp                     # Build screen widgets, update fns called by net.cpp
+    ui/
+      lvgl_port.h, .cpp            # LVGL init: display flush_cb + indev cb + tick + lock
+      theme.h                      # Color constants (RGB565), fonts, layout dimensions
+      gfx.h, .cpp                  # Thin facade: gfx_fill_rect/circle/line over lv_canvas
+      mascot.h, .cpp               # Ported from firmware/mascot.cpp, uses gfx facade
+      ui.h, .cpp                   # Build screen widgets, update fns called by net.cpp
 
-  net/
-    net.h, .cpp                    # ADAPTED from firmware/net.cpp (only includes change)
+    net/
+      net.h, .cpp                  # ADAPTED from firmware/net.cpp (only includes change)
 
 scripts/
   build-c6.sh                      # NEW
@@ -53,7 +55,11 @@ firmware-c6/README.md              # NEW: quickstart for the C6 board
 README.md                          # MODIFIED: one-line link to C6 README
 ```
 
-**One file = one responsibility.** Each `hw/*` file owns one peripheral. `ui/*` does no hardware. `net/*` does no display work — it mutates `g_state` and calls `ui_request_update()`. This boundary is what lets later boards swap `hw/` without touching `ui/` or `net/`.
+**One file = one responsibility.** Each `src/hw/*` file owns one peripheral. `src/ui/*` does no hardware. `src/net/*` does no display work — it mutates `g_state` and calls `ui_apply_state()`. This boundary is what lets later boards swap `src/hw/` without touching `src/ui/` or `src/net/`.
+
+**Include conventions:**
+- From sketch root (`firmware-c6.ino`): `#include "src/hw/pins.h"`, `#include "src/ui/ui.h"`, etc.
+- Within `src/<module>/`: peer headers in the same module use bare names (`#include "i2c_bus.h"`); cross-module uses one-up (`#include "../hw/pins.h"`); sketch-root headers use two-up (`#include "../../state.h"`, `#include "../../config.h"`).
 
 ---
 
@@ -312,14 +318,14 @@ git commit -m "firmware-c6: project skeleton compiles and runs on ESP32-C6"
 ## Task 2: Pin Map + I2C Bus + I2C Scanner (Gate G1)
 
 **Files:**
-- Create: `firmware-c6/hw/pins.h`
-- Create: `firmware-c6/hw/i2c_bus.h`
-- Create: `firmware-c6/hw/i2c_bus.cpp`
+- Create: `firmware-c6/src/hw/pins.h`
+- Create: `firmware-c6/src/hw/i2c_bus.h`
+- Create: `firmware-c6/src/hw/i2c_bus.cpp`
 - Modify: `firmware-c6/firmware-c6.ino`
 
 **Goal:** I2C bus comes up on GPIO 7/8 at 400kHz. A scan loop prints addresses found. The known on-board devices respond: `0x34` (AXP2101), `0x6B` (QMI8658), `0x51` (PCF85063). CST9220 (`0x5A`) **may not respond yet** — its power may be gated through AXP2101 (gets unblocked in Task 3).
 
-- [ ] **Step 2.1: Create `firmware-c6/hw/pins.h`**
+- [ ] **Step 2.1: Create `firmware-c6/src/hw/pins.h`**
 
 ```c
 #pragma once
@@ -355,7 +361,7 @@ git commit -m "firmware-c6: project skeleton compiles and runs on ESP32-C6"
 #define LCD_BITS_PP     16   // RGB565
 ```
 
-- [ ] **Step 2.2: Create `firmware-c6/hw/i2c_bus.h`**
+- [ ] **Step 2.2: Create `firmware-c6/src/hw/i2c_bus.h`**
 
 ```c
 #pragma once
@@ -368,7 +374,7 @@ void i2c_write_reg(uint8_t addr, uint8_t reg, uint8_t val);
 void i2c_scan_print();
 ```
 
-- [ ] **Step 2.3: Create `firmware-c6/hw/i2c_bus.cpp`**
+- [ ] **Step 2.3: Create `firmware-c6/src/hw/i2c_bus.cpp`**
 
 ```c
 #include "i2c_bus.h"
@@ -418,7 +424,7 @@ Replace entire file with:
 
 ```c
 #include <Arduino.h>
-#include "hw/i2c_bus.h"
+#include "src/hw/i2c_bus.h"
 
 void setup() {
   Serial.begin(115200);
@@ -459,7 +465,7 @@ If you also see `0x5A` (CST9220) already → great, the touch IC is on the share
 - [ ] **Step 2.6: Commit**
 
 ```bash
-git add firmware-c6/hw/ firmware-c6/firmware-c6.ino
+git add firmware-c6/src/hw/ firmware-c6/firmware-c6.ino
 git commit -m "firmware-c6: I2C bus up; G1 passes (AXP2101 + QMI8658 + PCF85063 detected)"
 ```
 
@@ -468,15 +474,15 @@ git commit -m "firmware-c6: I2C bus up; G1 passes (AXP2101 + QMI8658 + PCF85063 
 ## Task 3: AXP2101 PMIC — Enable LCD Power (Gate G2)
 
 **Files:**
-- Create: `firmware-c6/hw/pmic_axp2101.h`
-- Create: `firmware-c6/hw/pmic_axp2101.cpp`
+- Create: `firmware-c6/src/hw/pmic_axp2101.h`
+- Create: `firmware-c6/src/hw/pmic_axp2101.cpp`
 - Modify: `firmware-c6/firmware-c6.ino`
 
 **Goal:** AXP2101 initialized; LCD power rails (ALDO1, BLDO1) enabled. After this runs, a second I2C scan also reveals CST9220 at `0x5A` (its rail comes on with the LCD).
 
 > **Reference:** Waveshare publishes the AXP2101 init for this exact board in `02_Example/Arduino-v3.3.3/08_LVGL_V8_Test/src/port_bsp/axp2101_bsp.{h,cpp}` at https://github.com/waveshareteam/ESP32-C6-Touch-AMOLED-2.16 . Fetch those two files for the exact register sequence — don't reverse-engineer from a datasheet. The code below is a clean rewrite of the same sequence with Wire.h.
 
-- [ ] **Step 3.1: Create `firmware-c6/hw/pmic_axp2101.h`**
+- [ ] **Step 3.1: Create `firmware-c6/src/hw/pmic_axp2101.h`**
 
 ```c
 #pragma once
@@ -493,7 +499,7 @@ void pmic_set_brightness(uint8_t level);
 uint16_t pmic_battery_mv();
 ```
 
-- [ ] **Step 3.2: Create `firmware-c6/hw/pmic_axp2101.cpp`**
+- [ ] **Step 3.2: Create `firmware-c6/src/hw/pmic_axp2101.cpp`**
 
 > **Implementer note:** before pasting, open Waveshare's `axp2101_bsp.cpp` and confirm the register values below match. Their config powers ALDO1 = 3.3V (LCD logic), BLDO1 = 1.8V (LCD analog), and various other rails. If the official file differs, prefer the official values — this file is a hand-translation that may need adjustment.
 
@@ -558,8 +564,8 @@ Edit `firmware-c6/firmware-c6.ino`:
 
 ```c
 #include <Arduino.h>
-#include "hw/i2c_bus.h"
-#include "hw/pmic_axp2101.h"
+#include "src/hw/i2c_bus.h"
+#include "src/hw/pmic_axp2101.h"
 
 void setup() {
   Serial.begin(115200);
@@ -620,7 +626,7 @@ Battery: 0 mV               <-- or actual voltage if battery is fitted
 - [ ] **Step 3.5: Commit**
 
 ```bash
-git add firmware-c6/hw/pmic_axp2101.{h,cpp} firmware-c6/firmware-c6.ino
+git add firmware-c6/src/hw/pmic_axp2101.{h,cpp} firmware-c6/firmware-c6.ino
 git commit -m "firmware-c6: AXP2101 brings up LCD power rails; G2 passes (CST9220 now visible)"
 ```
 
@@ -629,8 +635,8 @@ git commit -m "firmware-c6: AXP2101 brings up LCD power rails; G2 passes (CST922
 ## Task 4: CO5300 AMOLED Bring-up — Solid Color Test (Gate G3)
 
 **Files:**
-- Create: `firmware-c6/hw/co5300.h`
-- Create: `firmware-c6/hw/co5300.cpp`
+- Create: `firmware-c6/src/hw/co5300.h`
+- Create: `firmware-c6/src/hw/co5300.cpp`
 - Modify: `firmware-c6/firmware-c6.ino`
 
 **Goal:** QSPI bus configured, esp_lcd_panel_io handle created, CO5300 init sequence sent. Display fills solid red, green, blue, white in sequence.
@@ -640,11 +646,11 @@ git commit -m "firmware-c6: AXP2101 brings up LCD power rails; G2 passes (CST922
 - [ ] **Step 4.1: Vendor the Waveshare CO5300 init sequence**
 
 ```bash
-mkdir -p firmware-c6/hw/co5300_vendor
+mkdir -p firmware-c6/src/hw/co5300_vendor
 curl -fsSL https://raw.githubusercontent.com/waveshareteam/ESP32-C6-Touch-AMOLED-2.16/main/02_Example/Arduino-v3.3.3/08_LVGL_V8_Test/bsp_lvgl_port.cpp \
-  -o firmware-c6/hw/co5300_vendor/bsp_lvgl_port.cpp
+  -o firmware-c6/src/hw/co5300_vendor/bsp_lvgl_port.cpp
 curl -fsSL https://raw.githubusercontent.com/waveshareteam/ESP32-C6-Touch-AMOLED-2.16/main/02_Example/Arduino-v3.3.3/08_LVGL_V8_Test/bsp_lvgl_port.h \
-  -o firmware-c6/hw/co5300_vendor/bsp_lvgl_port.h
+  -o firmware-c6/src/hw/co5300_vendor/bsp_lvgl_port.h
 ```
 
 Add an attribution comment at the top of each file:
@@ -656,7 +662,7 @@ Add an attribution comment at the top of each file:
 // not documented elsewhere. Apache-2.0 / per upstream LICENSE.
 ```
 
-- [ ] **Step 4.2: Create `firmware-c6/hw/co5300.h`**
+- [ ] **Step 4.2: Create `firmware-c6/src/hw/co5300.h`**
 
 ```c
 #pragma once
@@ -674,7 +680,7 @@ bool co5300_init(esp_lcd_panel_io_handle_t *io_out,
 void co5300_set_brightness(esp_lcd_panel_io_handle_t io, uint8_t level);
 ```
 
-- [ ] **Step 4.3: Create `firmware-c6/hw/co5300.cpp`**
+- [ ] **Step 4.3: Create `firmware-c6/src/hw/co5300.cpp`**
 
 ```c
 #include "co5300.h"
@@ -709,7 +715,7 @@ void co5300_set_brightness(esp_lcd_panel_io_handle_t io, uint8_t level) {
 }
 ```
 
-**Wrap the vendored upstream function:** in `firmware-c6/hw/co5300_vendor/bsp_lvgl_port.cpp`, find the existing initialization function (it will be named something like `bsp_lvgl_init` or `Lcd_Init`). At the bottom of that file, add an extern "C" wrapper that calls the existing init internals but stops before the LVGL part — we only want the LCD bring-up here. **Read the vendored file carefully** and identify the section between "SPI bus config" and "before lvgl_init" — extract that into a function named `waveshare_co5300_bring_up`. If the vendored code does it all in one function, copy the upper portion (everything before `lv_init()`) into the new function.
+**Wrap the vendored upstream function:** in `firmware-c6/src/hw/co5300_vendor/bsp_lvgl_port.cpp`, find the existing initialization function (it will be named something like `bsp_lvgl_init` or `Lcd_Init`). At the bottom of that file, add an extern "C" wrapper that calls the existing init internals but stops before the LVGL part — we only want the LCD bring-up here. **Read the vendored file carefully** and identify the section between "SPI bus config" and "before lvgl_init" — extract that into a function named `waveshare_co5300_bring_up`. If the vendored code does it all in one function, copy the upper portion (everything before `lv_init()`) into the new function.
 
 If this proves fiddly (the upstream code is tangled), the simpler alternative is to **leave the vendored file structure as-is, call its main init from co5300.cpp, and accept that LVGL gets initialized one task earlier than planned.** Note this deviation in the commit message; subsequent tasks adapt.
 
@@ -717,10 +723,10 @@ If this proves fiddly (the upstream code is tangled), the simpler alternative is
 
 ```c
 #include <Arduino.h>
-#include "hw/i2c_bus.h"
-#include "hw/pmic_axp2101.h"
-#include "hw/co5300.h"
-#include "hw/pins.h"
+#include "src/hw/i2c_bus.h"
+#include "src/hw/pmic_axp2101.h"
+#include "src/hw/co5300.h"
+#include "src/hw/pins.h"
 #include "esp_heap_caps.h"
 
 esp_lcd_panel_io_handle_t g_io   = nullptr;
@@ -785,7 +791,7 @@ Also note the free heap printed — it should be ≥ 320KB at this point. Record
 - [ ] **Step 4.6: Commit**
 
 ```bash
-git add firmware-c6/hw/co5300* firmware-c6/firmware-c6.ino
+git add firmware-c6/src/hw/co5300* firmware-c6/firmware-c6.ino
 git commit -m "firmware-c6: CO5300 init via vendored Waveshare BSP; G3 solid-color test passes"
 ```
 
@@ -794,9 +800,9 @@ git commit -m "firmware-c6: CO5300 init via vendored Waveshare BSP; G3 solid-col
 ## Task 5: LVGL Port — Hello World (Gate G4)
 
 **Files:**
-- Create: `firmware-c6/ui/lvgl_port.h`
-- Create: `firmware-c6/ui/lvgl_port.cpp`
-- Create: `firmware-c6/ui/theme.h`
+- Create: `firmware-c6/src/ui/lvgl_port.h`
+- Create: `firmware-c6/src/ui/lvgl_port.cpp`
+- Create: `firmware-c6/src/ui/theme.h`
 - Create: `firmware-c6/lv_conf.h` (LVGL config — required at sketch root)
 - Modify: `firmware-c6/firmware-c6.ino`
 
@@ -834,7 +840,7 @@ Then edit `firmware-c6/lv_conf.h`:
 8. Find `#define LV_USE_CANVAS` → set to `1`.
 9. Find `#define LV_USE_PERF_MONITOR` → set to `0` (optional; enable later for debug).
 
-- [ ] **Step 5.2: Create `firmware-c6/ui/theme.h`**
+- [ ] **Step 5.2: Create `firmware-c6/src/ui/theme.h`**
 
 ```c
 #pragma once
@@ -877,7 +883,7 @@ constexpr uint16_t COL_ACCENT_ERROR  = 0xF820;
 constexpr uint16_t COL_ACCENT_DONE   = 0x07E5;
 ```
 
-- [ ] **Step 5.3: Create `firmware-c6/ui/lvgl_port.h`**
+- [ ] **Step 5.3: Create `firmware-c6/src/ui/lvgl_port.h`**
 
 ```c
 #pragma once
@@ -900,7 +906,7 @@ bool lvgl_port_lock(int timeout_ms);
 void lvgl_port_unlock();
 ```
 
-- [ ] **Step 5.4: Create `firmware-c6/ui/lvgl_port.cpp`**
+- [ ] **Step 5.4: Create `firmware-c6/src/ui/lvgl_port.cpp`**
 
 ```c
 #include "lvgl_port.h"
@@ -982,12 +988,12 @@ void lvgl_port_unlock() {
 ```c
 #include <Arduino.h>
 #include "lvgl.h"
-#include "hw/i2c_bus.h"
-#include "hw/pmic_axp2101.h"
-#include "hw/co5300.h"
-#include "hw/pins.h"
-#include "ui/lvgl_port.h"
-#include "ui/theme.h"
+#include "src/hw/i2c_bus.h"
+#include "src/hw/pmic_axp2101.h"
+#include "src/hw/co5300.h"
+#include "src/hw/pins.h"
+#include "src/ui/lvgl_port.h"
+#include "src/ui/theme.h"
 
 esp_lcd_panel_io_handle_t g_io;
 esp_lcd_panel_handle_t    g_panel;
@@ -1045,7 +1051,7 @@ Common problems & fixes:
 - [ ] **Step 5.7: Commit**
 
 ```bash
-git add firmware-c6/lv_conf.h firmware-c6/ui/ firmware-c6/firmware-c6.ino
+git add firmware-c6/lv_conf.h firmware-c6/src/ui/ firmware-c6/firmware-c6.ino
 git commit -m "firmware-c6: LVGL hello world; G4 passes (partial buf 2x46KB)"
 ```
 
@@ -1054,10 +1060,10 @@ git commit -m "firmware-c6: LVGL hello world; G4 passes (partial buf 2x46KB)"
 ## Task 6: Mascot Canvas + Procedural Drawing (Gate G5)
 
 **Files:**
-- Create: `firmware-c6/ui/gfx.h`
-- Create: `firmware-c6/ui/gfx.cpp`
-- Create: `firmware-c6/ui/mascot.h`
-- Create: `firmware-c6/ui/mascot.cpp`
+- Create: `firmware-c6/src/ui/gfx.h`
+- Create: `firmware-c6/src/ui/gfx.cpp`
+- Create: `firmware-c6/src/ui/mascot.h`
+- Create: `firmware-c6/src/ui/mascot.cpp`
 - Modify: `firmware-c6/firmware-c6.ino`
 
 **Goal:** A 480×240 (or smaller, see fallback) `lv_canvas_t` in the upper half. The pixel-grid mascot is drawn into it. An `lv_timer` ticks at 33ms and redraws so animations work. Idle state is visible.
@@ -1070,7 +1076,7 @@ git commit -m "firmware-c6: LVGL hello world; G4 passes (partial buf 2x46KB)"
 | 230..290 KB | 400×240 | 188 KB |
 | < 230 KB | 360×240 | 172 KB |
 
-In `firmware-c6/ui/theme.h`, set `MASCOT_W` and `MASCOT_H` to match. The mascot is centered within the upper half automatically by the layout (we set `MASCOT_X` to `(LCD_W - MASCOT_W) / 2`).
+In `firmware-c6/src/ui/theme.h`, set `MASCOT_W` and `MASCOT_H` to match. The mascot is centered within the upper half automatically by the layout (we set `MASCOT_X` to `(LCD_W - MASCOT_W) / 2`).
 
 If you picked smaller, also update `MASCOT_X`:
 
@@ -1079,7 +1085,7 @@ constexpr int MASCOT_W = 400;
 constexpr int MASCOT_X = (480 - 400) / 2;   // = 40
 ```
 
-- [ ] **Step 6.2: Create `firmware-c6/ui/gfx.h`**
+- [ ] **Step 6.2: Create `firmware-c6/src/ui/gfx.h`**
 
 ```c
 #pragma once
@@ -1099,7 +1105,7 @@ static inline lv_color_t rgb565_to_lv(uint16_t v) {
 }
 ```
 
-- [ ] **Step 6.3: Create `firmware-c6/ui/gfx.cpp`**
+- [ ] **Step 6.3: Create `firmware-c6/src/ui/gfx.cpp`**
 
 ```c
 #include "gfx.h"
@@ -1130,12 +1136,12 @@ void gfx_fill_circle(lv_obj_t *canvas, int cx, int cy, int r, lv_color_t c) {
 }
 ```
 
-- [ ] **Step 6.4: Create `firmware-c6/ui/mascot.h`**
+- [ ] **Step 6.4: Create `firmware-c6/src/ui/mascot.h`**
 
 ```c
 #pragma once
 #include "lvgl.h"
-#include "../state.h"
+#include "../../state.h"
 
 // Create the mascot canvas as a child of `parent`, positioned per theme.h.
 // Allocates the canvas pixel buffer (MASCOT_W * MASCOT_H * 2 bytes).
@@ -1149,7 +1155,7 @@ void mascot_draw(lv_obj_t *canvas, MascotState state);
 uint32_t mascot_anim_interval(MascotState state);
 ```
 
-- [ ] **Step 6.5: Create `firmware-c6/ui/mascot.cpp`**
+- [ ] **Step 6.5: Create `firmware-c6/src/ui/mascot.cpp`**
 
 This is a direct port of `firmware/mascot.cpp` with the LovyanGFX API calls swapped for the `gfx_*` facade. The pixel-grid art and animation phase logic are identical.
 
@@ -1338,7 +1344,7 @@ Replace `setup()`'s "Build a hello screen" block with:
   Serial.printf("Free heap after mascot: %u bytes\n", ESP.getFreeHeap());
 ```
 
-Add `#include "ui/mascot.h"` at the top.
+Add `#include "src/ui/mascot.h"` at the top.
 
 - [ ] **Step 6.7: Build, flash, verify (Gate G5)**
 
@@ -1359,7 +1365,7 @@ If mascot pixels look wrong colors → `LV_COLOR_16_SWAP` mismatch. Toggle and r
 - [ ] **Step 6.8: Commit**
 
 ```bash
-git add firmware-c6/ui/gfx.{h,cpp} firmware-c6/ui/mascot.{h,cpp} firmware-c6/ui/theme.h firmware-c6/firmware-c6.ino
+git add firmware-c6/src/ui/gfx.{h,cpp} firmware-c6/src/ui/mascot.{h,cpp} firmware-c6/src/ui/theme.h firmware-c6/firmware-c6.ino
 git commit -m "firmware-c6: mascot canvas with idle animation; G5 passes"
 ```
 
@@ -1368,13 +1374,13 @@ git commit -m "firmware-c6: mascot canvas with idle animation; G5 passes"
 ## Task 7: CST9220 Touch Driver — Raw Coordinates (Gate G6)
 
 **Files:**
-- Create: `firmware-c6/hw/touch_cst9220.h`
-- Create: `firmware-c6/hw/touch_cst9220.cpp`
+- Create: `firmware-c6/src/hw/touch_cst9220.h`
+- Create: `firmware-c6/src/hw/touch_cst9220.cpp`
 - Modify: `firmware-c6/firmware-c6.ino`
 
 **Goal:** Touching the screen prints raw X/Y coordinates over serial. The INT pin triggers correctly.
 
-- [ ] **Step 7.1: Create `firmware-c6/hw/touch_cst9220.h`**
+- [ ] **Step 7.1: Create `firmware-c6/src/hw/touch_cst9220.h`**
 
 ```c
 #pragma once
@@ -1387,7 +1393,7 @@ bool touch_init();
 bool touch_read(uint16_t *x, uint16_t *y);
 ```
 
-- [ ] **Step 7.2: Create `firmware-c6/hw/touch_cst9220.cpp`**
+- [ ] **Step 7.2: Create `firmware-c6/src/hw/touch_cst9220.cpp`**
 
 The CST9220 read protocol is shown in Waveshare's `lcd_touch.cpp` (already inspected during spec-writing). The data sheet register at `0xD000` returns a 10-byte structure: `[status, x_hi, y_hi, lo_pack, ?, points, magic=0xAB, ...]`.
 
@@ -1458,7 +1464,7 @@ bool touch_read(uint16_t *x, uint16_t *y) {
 
 - [ ] **Step 7.3: Wire into `firmware-c6.ino`**
 
-Add `#include "hw/touch_cst9220.h"`. In `setup()` after `lvgl_port_init`, add:
+Add `#include "src/hw/touch_cst9220.h"`. In `setup()` after `lvgl_port_init`, add:
 
 ```c
   if (!touch_init()) {
@@ -1493,7 +1499,7 @@ If axes are swapped or inverted: try removing the `LCD_H_RES - rx` mirror, or sw
 - [ ] **Step 7.5: Commit**
 
 ```bash
-git add firmware-c6/hw/touch_cst9220.{h,cpp} firmware-c6/firmware-c6.ino
+git add firmware-c6/src/hw/touch_cst9220.{h,cpp} firmware-c6/firmware-c6.ino
 git commit -m "firmware-c6: CST9220 touch driver; G6 passes (raw XY coords reported)"
 ```
 
@@ -1502,18 +1508,18 @@ git commit -m "firmware-c6: CST9220 touch driver; G6 passes (raw XY coords repor
 ## Task 8: Full UI Widgets (state label, tool chip, message, token bar)
 
 **Files:**
-- Create: `firmware-c6/ui/ui.h`
-- Create: `firmware-c6/ui/ui.cpp`
+- Create: `firmware-c6/src/ui/ui.h`
+- Create: `firmware-c6/src/ui/ui.cpp`
 - Modify: `firmware-c6/firmware-c6.ino`
 
 **Goal:** The lower half of the screen shows: state name, tool chip + tool name, message (up to 2 lines, CJK supported), token bar + "85k / 200k" text + "42%" percentage. All update when `g_state` changes.
 
-- [ ] **Step 8.1: Create `firmware-c6/ui/ui.h`**
+- [ ] **Step 8.1: Create `firmware-c6/src/ui/ui.h`**
 
 ```c
 #pragma once
 #include "lvgl.h"
-#include "../state.h"
+#include "../../state.h"
 
 extern AppState g_state;     // defined in firmware-c6.ino
 
@@ -1521,7 +1527,7 @@ void ui_init();              // builds widgets; call after lvgl_port_init
 void ui_apply_state();       // call after mutating g_state to refresh widgets
 ```
 
-- [ ] **Step 8.2: Create `firmware-c6/ui/ui.cpp`**
+- [ ] **Step 8.2: Create `firmware-c6/src/ui/ui.cpp`**
 
 ```c
 #include "ui.h"
@@ -1709,14 +1715,14 @@ Replace `setup()` mascot-only code with full ui_init. Add a temporary state-cycl
 #include <Arduino.h>
 #include "lvgl.h"
 #include "state.h"
-#include "hw/i2c_bus.h"
-#include "hw/pmic_axp2101.h"
-#include "hw/co5300.h"
-#include "hw/touch_cst9220.h"
-#include "hw/pins.h"
-#include "ui/lvgl_port.h"
-#include "ui/ui.h"
-#include "ui/theme.h"
+#include "src/hw/i2c_bus.h"
+#include "src/hw/pmic_axp2101.h"
+#include "src/hw/co5300.h"
+#include "src/hw/touch_cst9220.h"
+#include "src/hw/pins.h"
+#include "src/ui/lvgl_port.h"
+#include "src/ui/ui.h"
+#include "src/ui/theme.h"
 
 AppState g_state;
 esp_lcd_panel_io_handle_t g_io;
@@ -1758,7 +1764,7 @@ const ToolIcon CYCLE_TOOLS[] = {
 const char *CYCLE_MSGS[] = {
   "Idle",
   "Reading your prompt...",
-  "Editing firmware-c6/ui/ui.cpp",
+  "Editing firmware-c6/src/ui/ui.cpp",
   "Approve write to /etc/hosts?",
   "Bash failed: exit 1",
   "完成 — 3 個檔案已更新",
@@ -1806,7 +1812,7 @@ void loop() {
 - [ ] **Step 8.5: Commit**
 
 ```bash
-git add firmware-c6/ui/ui.{h,cpp} firmware-c6/firmware-c6.ino
+git add firmware-c6/src/ui/ui.{h,cpp} firmware-c6/firmware-c6.ino
 git commit -m "firmware-c6: full UI with state/tool/message/token-bar widgets"
 ```
 
@@ -1815,15 +1821,15 @@ git commit -m "firmware-c6: full UI with state/tool/message/token-bar widgets"
 ## Task 9: WiFi + mDNS + HTTP API (Gate G7)
 
 **Files:**
-- Create: `firmware-c6/net/net.h`
-- Create: `firmware-c6/net/net.cpp`
+- Create: `firmware-c6/src/net/net.h`
+- Create: `firmware-c6/src/net/net.cpp`
 - Modify: `firmware-c6/firmware-c6.ino`
 
 **Goal:** Device connects to WiFi, advertises `claudy.local`, accepts `POST /state` and `GET /state`, mutates `g_state` and calls `ui_apply_state()`. The state cycler from Task 8 is removed.
 
 `firmware/net.cpp` is the source of truth — the only changes are includes (`display.h` → `ui/ui.h`, `requestRedraw()` → `ui_apply_state()`) and adding the `lvgl_port_lock` around UI calls.
 
-- [ ] **Step 9.1: Create `firmware-c6/net/net.h`**
+- [ ] **Step 9.1: Create `firmware-c6/src/net/net.h`**
 
 ```c
 #pragma once
@@ -1834,14 +1840,14 @@ void netLoop();
 bool netIsConnected();
 ```
 
-- [ ] **Step 9.2: Create `firmware-c6/net/net.cpp`**
+- [ ] **Step 9.2: Create `firmware-c6/src/net/net.cpp`**
 
 ```c
 #include "net.h"
-#include "../state.h"
+#include "../../state.h"
 #include "../ui/ui.h"
 #include "../ui/lvgl_port.h"
-#include "../config.h"
+#include "../../config.h"
 
 #include <WiFi.h>
 #include <WebServer.h>
@@ -1984,15 +1990,15 @@ bool netIsConnected() {
 #include "lvgl.h"
 #include "config.h"
 #include "state.h"
-#include "hw/i2c_bus.h"
-#include "hw/pmic_axp2101.h"
-#include "hw/co5300.h"
-#include "hw/touch_cst9220.h"
-#include "hw/pins.h"
-#include "ui/lvgl_port.h"
-#include "ui/ui.h"
-#include "ui/theme.h"
-#include "net/net.h"
+#include "src/hw/i2c_bus.h"
+#include "src/hw/pmic_axp2101.h"
+#include "src/hw/co5300.h"
+#include "src/hw/touch_cst9220.h"
+#include "src/hw/pins.h"
+#include "src/ui/lvgl_port.h"
+#include "src/ui/ui.h"
+#include "src/ui/theme.h"
+#include "src/net/net.h"
 
 AppState g_state;
 esp_lcd_panel_io_handle_t g_io;
@@ -2114,7 +2120,7 @@ If the existing T-Display-S3 device is on the same network with the same hostnam
 - [ ] **Step 9.6: Commit**
 
 ```bash
-git add firmware-c6/net/ firmware-c6/firmware-c6.ino
+git add firmware-c6/src/net/ firmware-c6/firmware-c6.ino
 git commit -m "firmware-c6: WiFi + mDNS + /state API; G7 passes (curl drives screen)"
 ```
 
@@ -2171,13 +2177,13 @@ git commit -m "firmware-c6: end-to-end with Claude Code hooks verified (G8 + G9 
 
 **Files:**
 - Modify: `firmware-c6/firmware-c6.ino`
-- Modify: `firmware-c6/hw/pmic_axp2101.cpp` (or `co5300.cpp`) to actually implement brightness fade
+- Modify: `firmware-c6/src/hw/pmic_axp2101.cpp` (or `co5300.cpp`) to actually implement brightness fade
 
 **Goal:** After 60s of inactivity, brightness fades to low (≈ 20%). A tap (or new POST) restores full brightness.
 
 - [ ] **Step 11.1: Implement real brightness control**
 
-Update `firmware-c6/hw/co5300.cpp`'s `co5300_set_brightness` to send the actual DCS 0x51 command (already done in Task 4). Confirm via serial: print current brightness after each change.
+Update `firmware-c6/src/hw/co5300.cpp`'s `co5300_set_brightness` to send the actual DCS 0x51 command (already done in Task 4). Confirm via serial: print current brightness after each change.
 
 - [ ] **Step 11.2: Add fade logic in `firmware-c6.ino`**
 
@@ -2230,7 +2236,7 @@ Leave the device running overnight (24h). Before leaving, record `GET /state` `f
 - [ ] **Step 11.5: Commit**
 
 ```bash
-git add firmware-c6/firmware-c6.ino firmware-c6/hw/co5300.cpp
+git add firmware-c6/firmware-c6.ino firmware-c6/src/hw/co5300.cpp
 git commit -m "firmware-c6: idle fade + tap-to-wake; G10 soak test passes"
 ```
 
@@ -2307,7 +2313,7 @@ boot steps, that will fail silently. See setup() in `firmware-c6.ino` —
 `pmic_init()` must precede `co5300_init()`.
 
 **"mascot canvas alloc failed"**
-Free heap too low. Reduce `MASCOT_W` and `MASCOT_H` in `firmware-c6/ui/theme.h`
+Free heap too low. Reduce `MASCOT_W` and `MASCOT_H` in `firmware-c6/src/ui/theme.h`
 (400×240 or 360×240).
 
 **Colors look wrong (red/blue swapped)**
@@ -2321,27 +2327,28 @@ firmware-c6/
   state.h            AppState enums (shared semantics with firmware/state.h)
   lv_conf.h          LVGL config
 
-  hw/                hardware drivers — one peripheral per file
-    pins.h
-    i2c_bus.{h,cpp}
-    pmic_axp2101.{h,cpp}
-    co5300.{h,cpp}            + co5300_vendor/ (Waveshare-provided init)
-    touch_cst9220.{h,cpp}
+  src/               Arduino compiles .cpp under here recursively
+    hw/              hardware drivers — one peripheral per file
+      pins.h
+      i2c_bus.{h,cpp}
+      pmic_axp2101.{h,cpp}
+      co5300.{h,cpp}          + co5300_vendor/ (Waveshare-provided init)
+      touch_cst9220.{h,cpp}
 
-  ui/                no hardware here — pure LVGL
-    lvgl_port.{h,cpp}
-    theme.h
-    gfx.{h,cpp}
-    mascot.{h,cpp}
-    ui.{h,cpp}
+    ui/              no hardware here — pure LVGL
+      lvgl_port.{h,cpp}
+      theme.h
+      gfx.{h,cpp}
+      mascot.{h,cpp}
+      ui.{h,cpp}
 
-  net/
-    net.{h,cpp}      WiFi + mDNS + WebServer (parallel to firmware/net.cpp)
+    net/
+      net.{h,cpp}    WiFi + mDNS + WebServer (parallel to firmware/net.cpp)
 ```
 
 ## License
 
-Same as parent project. `hw/co5300_vendor/` is vendored from Waveshare's
+Same as parent project. `src/hw/co5300_vendor/` is vendored from Waveshare's
 official example repo (Apache-2.0 / per upstream LICENSE).
 ```
 
