@@ -29,9 +29,11 @@ arduino-cli core install esp32:esp32
 echo "==> Installing libraries"
 arduino-cli lib install "LovyanGFX"
 arduino-cli lib install "ArduinoJson"
+arduino-cli lib install "lvgl@8.3.11"
 
 echo "==> Done"
 echo "Next:"
 echo "  1) cp firmware/config.h.example firmware/config.h  (edit your WiFi)"
 echo "  2) ./scripts/build.sh"
-echo "  3) Plug in T-Display-S3 then ./scripts/flash.sh"
+echo "  3a) T-Display-S3:  ./scripts/build.sh && ./scripts/flash.sh"
+echo "  3b) ESP32-C6 AMOLED 2.16: cp firmware-c6/config.h.example firmware-c6/config.h && \$EDITOR firmware-c6/config.h && ./scripts/build-c6.sh && ./scripts/flash-c6.sh"

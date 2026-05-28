@@ -1,0 +1,9 @@
+default_profile: esp32c6_amoled
+
+profiles:
+  esp32c6_amoled:
+    fqbn: esp32:esp32:esp32c6:CDCOnBoot=cdc,FlashSize=16M,FlashMode=qio,PartitionScheme=app3M_fat9M_16MB,CPUFreq=160,UploadSpeed=921600,DebugLevel=none
+    platforms:
+      - platform: esp32:esp32 (3.0.7)
+    libraries:
+      - ArduinoJson (7.1.0)
