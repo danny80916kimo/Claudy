@@ -1,13 +1,16 @@
 #include <Arduino.h>
+#include "src/hw/i2c_bus.h"
 
 void setup() {
   Serial.begin(115200);
-  delay(2000);   // let CDC enumerate
+  delay(2000);
   Serial.println("\n=== Claudy-C6 boot ===");
-  Serial.println("Skeleton sketch OK");
+  i2c_bus_begin();
+  delay(50);
+  i2c_scan_print();
 }
 
 void loop() {
-  delay(5000);
-  Serial.println("alive");
+  delay(10000);
+  i2c_scan_print();
 }
