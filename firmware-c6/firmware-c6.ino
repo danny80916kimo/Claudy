@@ -8,12 +8,16 @@
 esp_lcd_panel_io_handle_t g_io   = nullptr;
 esp_lcd_panel_handle_t    g_panel = nullptr;
 
-static uint16_t *line_buf = nullptr;   // 480 px × 2 bytes
+// CO5300 only accepts even-aligned draw windows (2-px granularity). Drawing
+// 1-px-tall rows produced 1-row windows the panel rejected -> black screen.
+// Draw even-height bands instead (480 is divisible by 16).
+static const int BAND_ROWS = 16;
+static uint16_t *band_buf = nullptr;   // 480 × BAND_ROWS × 2 bytes
 
 static void fill_color(uint16_t color565) {
-  for (int i = 0; i < LCD_H_RES; i++) line_buf[i] = color565;
-  for (int y = 0; y < LCD_V_RES; y++) {
-    esp_lcd_panel_draw_bitmap(g_panel, 0, y, LCD_H_RES, y + 1, line_buf);
+  for (int i = 0; i < LCD_H_RES * BAND_ROWS; i++) band_buf[i] = color565;
+  for (int y = 0; y < LCD_V_RES; y += BAND_ROWS) {
+    esp_lcd_panel_draw_bitmap(g_panel, 0, y, LCD_H_RES, y + BAND_ROWS, band_buf);
   }
 }
 
@@ -30,8 +34,8 @@ void setup() {
   esp_lcd_panel_disp_on_off(g_panel, true);
   co5300_set_brightness(g_io, 200);
 
-  line_buf = (uint16_t*) heap_caps_malloc(LCD_H_RES * 2, MALLOC_CAP_DMA);
-  if (!line_buf) { Serial.println("line_buf alloc fail"); while (true) delay(1000); }
+  band_buf = (uint16_t*) heap_caps_malloc(LCD_H_RES * BAND_ROWS * 2, MALLOC_CAP_DMA);
+  if (!band_buf) { Serial.println("band_buf alloc fail"); while (true) delay(1000); }
 
   Serial.printf("Free heap after init: %u bytes\n", ESP.getFreeHeap());
 }
