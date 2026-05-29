@@ -27,7 +27,9 @@
 #define LV_COLOR_DEPTH 16
 
 /*Swap the 2 bytes of RGB565 color. Useful if the display has an 8-bit interface (e.g. SPI)*/
-#define LV_COLOR_16_SWAP 0
+/* CO5300 over QSPI needs the swap: without it, LVGL colors are byte-swapped
+   (orange mascot rendered green, dark eyes rendered purple). Confirmed at G5. */
+#define LV_COLOR_16_SWAP 1
 
 /*Enable features to draw on transparent background.
  *It's required if opa, and transform_* style properties are used.
