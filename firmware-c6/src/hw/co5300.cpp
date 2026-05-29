@@ -56,7 +56,7 @@ bool co5300_init(esp_lcd_panel_io_handle_t *io_out,
   io_config.cs_gpio_num = PIN_LCD_CS;
   io_config.dc_gpio_num = -1;
   io_config.spi_mode = 0;
-  io_config.pclk_hz = 40 * 1000 * 1000;
+  io_config.pclk_hz = 40 * 1000 * 1000;   // 40 MHz QSPI (Waveshare reference)
   io_config.trans_queue_depth = 2;
   io_config.lcd_cmd_bits = 32;
   io_config.lcd_param_bits = 8;
