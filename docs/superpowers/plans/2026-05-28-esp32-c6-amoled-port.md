@@ -1039,6 +1039,18 @@ static void flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *colo
   lv_disp_flush_ready(drv);
 }
 
+// CONFIRMED ON HARDWARE (Task 4 / Gate G3): the CO5300 only accepts
+// even-aligned draw windows (2-px granularity). Odd-aligned areas are
+// silently dropped -> black screen. Snap every flush area to even bounds,
+// exactly like Waveshare's my_disp_rounder. WITHOUT THIS, LVGL partial
+// draws will not appear.
+static void rounder_cb(lv_disp_drv_t *drv, lv_area_t *area) {
+  area->x1 = (area->x1 >> 1) << 1;          // start down to even
+  area->y1 = (area->y1 >> 1) << 1;
+  area->x2 = ((area->x2 >> 1) << 1) + 1;    // end up to odd -> even width/height
+  area->y2 = ((area->y2 >> 1) << 1) + 1;
+}
+
 bool lvgl_port_init(esp_lcd_panel_io_handle_t io, esp_lcd_panel_handle_t panel) {
   s_io = io;
   s_panel = panel;
@@ -1063,6 +1075,7 @@ bool lvgl_port_init(esp_lcd_panel_io_handle_t io, esp_lcd_panel_handle_t panel) 
   drv.hor_res = LCD_H_RES;
   drv.ver_res = LCD_V_RES;
   drv.flush_cb = flush_cb;
+  drv.rounder_cb = rounder_cb;   // REQUIRED: CO5300 needs even-aligned windows (see G3)
   drv.draw_buf = &s_draw_buf;
   lv_disp_drv_register(&drv);
 
