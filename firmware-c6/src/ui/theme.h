@@ -13,13 +13,18 @@ constexpr int MASCOT_Y = 0;
 constexpr int MASCOT_W = 400;
 constexpr int MASCOT_H = 240;     // 400x240 = 192KB canvas
 
-// Lower half — info region
-constexpr int INFO_X = 24;
-constexpr int INFO_Y = 256;
-constexpr int INFO_W = 432;       // padding 24 each side
-constexpr int INFO_H = 200;       // 256..456
-constexpr int BAR_Y  = 420;
-constexpr int BAR_H  = 18;
+// Lower half — info region (Option A: compact state+% row, big 2-line message, bar)
+constexpr int INFO_X   = 20;
+constexpr int INFO_W   = 440;       // 20px padding each side
+constexpr int STATE_Y  = 250;       // state name (left) + token % (right), 28px
+constexpr int TOOL_Y   = 292;       // tool chip + tool name
+constexpr int CHIP_W   = 36;
+constexpr int CHIP_H   = 28;
+constexpr int MSG_Y    = 330;       // message: 24px CJK, up to 2 lines
+constexpr int PCT_W    = 130;       // token % label (right-aligned in the state row)
+constexpr int BAR_Y    = 446;
+constexpr int BAR_H    = 16;
+constexpr int BAR_W    = 280;       // bar width; "Nk / Nk" detail sits to its right
 
 // RGB565 palette (same constants as firmware/mascot.cpp + display.cpp)
 constexpr uint16_t COL_BG       = 0x0000;   // black

@@ -3,6 +3,7 @@
 #include "theme.h"
 #include "lvgl_port.h"
 #include "gfx.h"
+#include "fonts.h"
 #include <Arduino.h>
 
 namespace {
@@ -63,17 +64,26 @@ void ui_init() {
   }
   s_anim_timer = lv_timer_create(anim_cb, mascot_anim_interval(STATE_IDLE), nullptr);
 
-  // State label (top of info region)
+  // State name — top-left of the info region
   s_state_label = lv_label_create(scr);
   lv_label_set_text(s_state_label, "Boot");
   lv_obj_set_style_text_font(s_state_label, &lv_font_montserrat_28, 0);
   lv_obj_set_style_text_color(s_state_label, lv_color_white(), 0);
-  lv_obj_set_pos(s_state_label, INFO_X, INFO_Y);
+  lv_obj_set_pos(s_state_label, INFO_X, STATE_Y);
+
+  // Token percentage — same row as the state name, right-aligned
+  s_bar_pct_label = lv_label_create(scr);
+  lv_obj_set_style_text_font(s_bar_pct_label, &lv_font_montserrat_28, 0);
+  lv_obj_set_style_text_color(s_bar_pct_label, lv_color_white(), 0);
+  lv_obj_set_width(s_bar_pct_label, PCT_W);
+  lv_obj_set_style_text_align(s_bar_pct_label, LV_TEXT_ALIGN_RIGHT, 0);
+  lv_obj_set_pos(s_bar_pct_label, INFO_X + INFO_W - PCT_W, STATE_Y);
+  lv_label_set_text(s_bar_pct_label, "");
 
   // Tool chip
   s_chip_bg = lv_obj_create(scr);
-  lv_obj_set_size(s_chip_bg, 36, 28);
-  lv_obj_set_pos(s_chip_bg, INFO_X, INFO_Y + 50);
+  lv_obj_set_size(s_chip_bg, CHIP_W, CHIP_H);
+  lv_obj_set_pos(s_chip_bg, INFO_X, TOOL_Y);
   lv_obj_set_style_radius(s_chip_bg, 6, 0);
   lv_obj_set_style_border_width(s_chip_bg, 0, 0);
   lv_obj_set_style_pad_all(s_chip_bg, 0, 0);
@@ -89,39 +99,32 @@ void ui_init() {
   s_tool_label = lv_label_create(scr);
   lv_obj_set_style_text_font(s_tool_label, &lv_font_montserrat_16, 0);
   lv_obj_set_style_text_color(s_tool_label, rgb565_to_lv(COL_DIM), 0);
-  lv_obj_set_pos(s_tool_label, INFO_X + 46, INFO_Y + 56);
+  lv_obj_set_pos(s_tool_label, INFO_X + CHIP_W + 10, TOOL_Y + 5);
   lv_label_set_text(s_tool_label, "");
 
-  // Message (2 lines, CJK)
+  // Message — big 24px Traditional-Chinese-capable font, up to 2 lines
   s_msg_label = lv_label_create(scr);
   lv_obj_set_width(s_msg_label, INFO_W);
   lv_label_set_long_mode(s_msg_label, LV_LABEL_LONG_WRAP);
-  lv_obj_set_style_text_font(s_msg_label, &lv_font_simsun_16_cjk, 0);
-  lv_obj_set_style_text_color(s_msg_label, rgb565_to_lv(COL_DIM), 0);
-  lv_obj_set_pos(s_msg_label, INFO_X, INFO_Y + 96);
+  lv_obj_set_style_text_font(s_msg_label, &font_claudy_cjk24, 0);
+  lv_obj_set_style_text_color(s_msg_label, lv_color_white(), 0);
+  lv_obj_set_pos(s_msg_label, INFO_X, MSG_Y);
   lv_label_set_text(s_msg_label, "Starting...");
 
-  // Token bar
+  // Token bar — bottom row, left portion
   s_bar = lv_bar_create(scr);
-  lv_obj_set_size(s_bar, INFO_W - 100, BAR_H);
+  lv_obj_set_size(s_bar, BAR_W, BAR_H);
   lv_obj_set_pos(s_bar, INFO_X, BAR_Y);
-  lv_bar_set_range(s_bar, 0, 1000);   // we'll scale used/max into 0..1000
+  lv_bar_set_range(s_bar, 0, 1000);   // we scale used/max into 0..1000
   lv_bar_set_value(s_bar, 0, LV_ANIM_OFF);
   lv_obj_set_style_bg_color(s_bar, rgb565_to_lv(0x4A49), LV_PART_MAIN);
   lv_obj_set_style_bg_color(s_bar, rgb565_to_lv(COL_BAR_OK), LV_PART_INDICATOR);
 
-  // Big percent (right of bar)
-  s_bar_pct_label = lv_label_create(scr);
-  lv_obj_set_style_text_font(s_bar_pct_label, &lv_font_montserrat_24, 0);
-  lv_obj_set_style_text_color(s_bar_pct_label, lv_color_white(), 0);
-  lv_obj_set_pos(s_bar_pct_label, INFO_X + (INFO_W - 100) + 12, BAR_Y - 6);
-  lv_label_set_text(s_bar_pct_label, "");
-
-  // Detail (above bar)
+  // "Nk / Nk" detail — right of the bar, same row
   s_bar_detail_label = lv_label_create(scr);
   lv_obj_set_style_text_font(s_bar_detail_label, &lv_font_montserrat_16, 0);
   lv_obj_set_style_text_color(s_bar_detail_label, rgb565_to_lv(0x8C71), 0);
-  lv_obj_set_pos(s_bar_detail_label, INFO_X, BAR_Y - 24);
+  lv_obj_set_pos(s_bar_detail_label, INFO_X + BAR_W + 12, BAR_Y - 4);
   lv_label_set_text(s_bar_detail_label, "");
 }
 
