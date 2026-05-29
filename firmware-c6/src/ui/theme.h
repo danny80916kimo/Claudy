@@ -1,9 +1,11 @@
 #pragma once
 #include <stdint.h>
+#include "../hw/pins.h"
 
-// Layout (480x480 screen, layout B from spec: upper half mascot, lower half info)
-constexpr int LCD_W = 480;
-constexpr int LCD_H = 480;
+// Layout (480x480 screen, layout B from spec: upper half mascot, lower half info).
+// Derive from the pins.h panel resolution so there's a single source of truth.
+constexpr int LCD_W = LCD_H_RES;
+constexpr int LCD_H = LCD_V_RES;
 
 // Upper half — mascot canvas region
 constexpr int MASCOT_X = 0;
