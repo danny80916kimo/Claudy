@@ -4,6 +4,7 @@
 #include "src/hw/pmic_axp2101.h"
 #include "src/hw/co5300.h"
 #include "src/hw/pins.h"
+#include "src/hw/touch_cst9220.h"
 #include "src/ui/lvgl_port.h"
 #include "src/ui/theme.h"
 #include "src/ui/mascot.h"
@@ -26,6 +27,10 @@ void setup() {
 
   if (!lvgl_port_init(g_io, g_panel)) while (true) delay(1000);
 
+  if (!touch_init()) {
+    Serial.println("WARN: touch init failed (continuing without touch)");
+  }
+
   lv_obj_t *scr = lv_scr_act();
   lv_obj_set_style_bg_color(scr, lv_color_make(0, 0, 0), 0);
 
@@ -47,6 +52,10 @@ void setup() {
 }
 
 void loop() {
+  uint16_t tx, ty;
+  if (touch_read(&tx, &ty)) {
+    Serial.printf("touch: x=%u y=%u\n", tx, ty);
+  }
   uint32_t delay_ms = lvgl_port_tick();
   delay(delay_ms);
 }
