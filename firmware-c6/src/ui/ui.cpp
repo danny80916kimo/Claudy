@@ -16,7 +16,6 @@ lv_obj_t *s_bar;
 lv_obj_t *s_bar_pct_label;
 lv_obj_t *s_bar_detail_label;
 
-MascotState s_last_anim_state = STATE_BOOT;
 lv_timer_t *s_anim_timer = nullptr;
 
 void anim_cb(lv_timer_t *t) {
