@@ -1681,9 +1681,10 @@ lv_timer_t *s_anim_timer = nullptr;
 
 void anim_cb(lv_timer_t *t) {
   mascot_draw(s_mascot, g_state.state);
-  // Adjust period if state changed
+  // Adjust period if state changed. NOTE: LVGL 8.3 has no lv_timer_get_period
+  // (that's 9.x) — read t->period directly (public struct field).
   uint32_t want = mascot_anim_interval(g_state.state);
-  if (want > 0 && want != lv_timer_get_period(t)) lv_timer_set_period(t, want);
+  if (want > 0 && want != t->period) lv_timer_set_period(t, want);
 }
 
 const char* tool_glyph(ToolIcon t) {
