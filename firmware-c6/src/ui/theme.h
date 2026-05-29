@@ -8,10 +8,10 @@ constexpr int LCD_W = LCD_H_RES;
 constexpr int LCD_H = LCD_V_RES;
 
 // Upper half — mascot canvas region
-constexpr int MASCOT_X = 0;
+constexpr int MASCOT_X = (480 - 400) / 2;   // = 40 (centered; art centers within)
 constexpr int MASCOT_Y = 0;
-constexpr int MASCOT_W = 480;
-constexpr int MASCOT_H = 240;     // 480x240 = 230KB; may shrink at G5 (see spec §7)
+constexpr int MASCOT_W = 400;
+constexpr int MASCOT_H = 240;     // 400x240 = 192KB canvas
 
 // Lower half — info region
 constexpr int INFO_X = 24;

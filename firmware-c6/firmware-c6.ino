@@ -6,6 +6,7 @@
 #include "src/hw/pins.h"
 #include "src/ui/lvgl_port.h"
 #include "src/ui/theme.h"
+#include "src/ui/mascot.h"
 
 esp_lcd_panel_io_handle_t g_io;
 esp_lcd_panel_handle_t    g_panel;
@@ -25,17 +26,24 @@ void setup() {
 
   if (!lvgl_port_init(g_io, g_panel)) while (true) delay(1000);
 
-  // Build a hello screen
   lv_obj_t *scr = lv_scr_act();
   lv_obj_set_style_bg_color(scr, lv_color_make(0, 0, 0), 0);
 
-  lv_obj_t *label = lv_label_create(scr);
-  lv_label_set_text(label, "Hello, Claudy");
-  lv_obj_set_style_text_color(label, lv_color_make(0xFF, 0xFF, 0xFF), 0);
-  lv_obj_set_style_text_font(label, &lv_font_montserrat_28, 0);
-  lv_obj_center(label);
+  lv_obj_t *mascot = mascot_create(scr);
+  if (!mascot) {
+    Serial.println("FATAL: mascot canvas alloc failed; shrink MASCOT_W/H in theme.h");
+    while (true) delay(1000);
+  }
 
-  Serial.printf("Free heap after UI init: %u bytes\n", ESP.getFreeHeap());
+  static MascotState anim_state = STATE_IDLE;
+  static lv_timer_t *mascot_timer = lv_timer_create(
+    [](lv_timer_t *t) {
+      lv_obj_t *c = (lv_obj_t*) t->user_data;
+      mascot_draw(c, anim_state);
+    }, mascot_anim_interval(STATE_IDLE), mascot);
+  (void)mascot_timer;
+
+  Serial.printf("Free heap after mascot: %u bytes\n", ESP.getFreeHeap());
 }
 
 void loop() {
