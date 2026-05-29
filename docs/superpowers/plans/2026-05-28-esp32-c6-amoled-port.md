@@ -648,30 +648,56 @@ git commit -m "firmware-c6: AXP2101 brings up LCD power rails; G2 passes (CST922
 
 **Goal:** QSPI bus configured, esp_lcd_panel_io handle created, CO5300 init sequence sent. Display fills solid red, green, blue, white in sequence.
 
-> **Reference:** The init sequence + esp_lcd panel callbacks for CO5300 live in `02_Example/Arduino-v3.3.3/08_LVGL_V8_Test/bsp_lvgl_port.cpp` and headers in `02_Example/Arduino-v3.3.3/08_LVGL_V8_Test/src/externLib/` in the Waveshare repo. **Copy that init command array and the QSPI setup code verbatim** at first. Refactor only after Gate G3 passes — the init sequence is undocumented and contains panel-specific magic. Don't try to derive it.
+> **Reference (already inspected — values below are confirmed from the actual Waveshare source):** The CO5300 is driven by the **SH8601 esp_lcd driver** (`esp_lcd_new_panel_sh8601`) — the CO5300 and SH8601 share a QSPI AMOLED command set. The driver lives at `02_Example/Arduino-v3.3.3/08_LVGL_V8_Test/src/externLib/esp_lcd_sh8601.{c,h}`. We vendor that driver verbatim and write our own thin `co5300.cpp` that configures the QSPI bus + panel_io, supplies the CO5300 init command array, performs the ALDO3 reset, and runs `esp_lcd_panel_init`. This is cleaner than extracting from the tangled `bsp_lvgl_port.cpp` (which also does LVGL + touch — we only want the LCD part here).
 
-> **Known constraint from Task 3:** ALDO3 is the LCD VCI rail. Waveshare's reference performs an off/on/off pulse on ALDO3 before sending CO5300 init commands. Task 3's `pmic_init()` leaves ALDO3 enabled (no reset pulse). If the display stays black at Gate G3, the most likely cause is the missing reset pulse — add a `pmic_pulse_aldo3()` helper to `pmic_axp2101.{h,cpp}` (writes register 0x90 bit 2 = 0, delays 100ms, = 1, delays 100ms) and call it before `co5300_init()`. The vendored Waveshare BSP may handle this internally; only add the helper if it doesn't.
+> **ALDO3 reset is mandatory (confirmed from Waveshare `DisplayPort_DispReset`):** the reset pulse is `ALDO3=1 → delay 100ms → ALDO3=0 → delay 100ms → ALDO3=1 → delay 100ms`, performed AFTER `esp_lcd_new_panel_sh8601` but BEFORE `esp_lcd_panel_init`. Task 4 adds a `pmic_set_aldo3(bool on)` helper to `pmic_axp2101.{h,cpp}` to drive this (sets/clears bit 2 of register 0x90).
 
-- [ ] **Step 4.1: Vendor the Waveshare CO5300 init sequence**
+> **Confirmed QSPI / panel config from Waveshare source:**
+> - SPI host: `SPI2_HOST`. Bus pins: SCLK=`PIN_LCD_SCLK`(0), D0=`PIN_LCD_D0`(1), D1=2, D2=3, D3=4. `max_transfer_sz = 480*480*16/8`.
+> - panel_io_spi: `cs_gpio_num = PIN_LCD_CS`(15), `dc_gpio_num = -1`, `spi_mode = 0`, `pclk_hz = 40MHz`, `trans_queue_depth = 2`, `lcd_cmd_bits = 32`, `lcd_param_bits = 8`, `flags.quad_mode = true`.
+> - panel_dev_config: `reset_gpio_num = -1` (no GPIO reset — ALDO3 does it), `rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB`, `bits_per_pixel = 16`, `vendor_config = &sh8601_vendor_config` with `flags.use_qspi_interface = 1`.
+> - The panel needs even-coordinate draw windows (Waveshare uses a rounder that snaps x1/y1 down and x2/y2 up to odd). The solid-color test fills full rows starting at x=0, so this isn't an issue for G3; it matters for partial draws in Task 5+.
+
+- [ ] **Step 4.1: Vendor the SH8601 esp_lcd driver**
 
 ```bash
 mkdir -p firmware-c6/src/hw/co5300_vendor
-curl -fsSL https://raw.githubusercontent.com/waveshareteam/ESP32-C6-Touch-AMOLED-2.16/main/02_Example/Arduino-v3.3.3/08_LVGL_V8_Test/bsp_lvgl_port.cpp \
-  -o firmware-c6/src/hw/co5300_vendor/bsp_lvgl_port.cpp
-curl -fsSL https://raw.githubusercontent.com/waveshareteam/ESP32-C6-Touch-AMOLED-2.16/main/02_Example/Arduino-v3.3.3/08_LVGL_V8_Test/bsp_lvgl_port.h \
-  -o firmware-c6/src/hw/co5300_vendor/bsp_lvgl_port.h
+curl -fsSL https://raw.githubusercontent.com/waveshareteam/ESP32-C6-Touch-AMOLED-2.16/main/02_Example/Arduino-v3.3.3/08_LVGL_V8_Test/src/externLib/esp_lcd_sh8601.c \
+  -o firmware-c6/src/hw/co5300_vendor/esp_lcd_sh8601.c
+curl -fsSL https://raw.githubusercontent.com/waveshareteam/ESP32-C6-Touch-AMOLED-2.16/main/02_Example/Arduino-v3.3.3/08_LVGL_V8_Test/src/externLib/esp_lcd_sh8601.h \
+  -o firmware-c6/src/hw/co5300_vendor/esp_lcd_sh8601.h
 ```
 
-Add an attribution comment at the top of each file:
+These files are Apache-2.0 (Espressif). Add a one-line provenance comment at the top of each (above the existing SPDX header):
 
 ```c
-// Vendored from Waveshare's official example for the ESP32-C6-Touch-AMOLED-2.16
-// board: https://github.com/waveshareteam/ESP32-C6-Touch-AMOLED-2.16
-// Used here for the CO5300 init sequence and QSPI/esp_lcd setup — both are
-// not documented elsewhere. Apache-2.0 / per upstream LICENSE.
+// Vendored verbatim from Waveshare's ESP32-C6-Touch-AMOLED-2.16 example
+// (src/externLib/). Espressif SH8601 driver, drives the CO5300 over QSPI.
 ```
 
-- [ ] **Step 4.2: Create `firmware-c6/src/hw/co5300.h`**
+Do NOT modify the driver body. If it fails to compile under Arduino (missing internal esp_lcd headers), report BLOCKED with the exact error — do not start hacking the driver.
+
+- [ ] **Step 4.2: Add `pmic_set_aldo3()` to `firmware-c6/src/hw/pmic_axp2101.h`**
+
+Add this declaration after `pmic_init()`:
+
+```c
+// Drive ALDO3 (the LCD VCI rail) on/off. Used for the CO5300 reset pulse.
+void pmic_set_aldo3(bool on);
+```
+
+And implement it in `firmware-c6/src/hw/pmic_axp2101.cpp` (the file already has `REG_LDO_ONOFF_CFG0` and `ADDR` in its anonymous namespace; ALDO3 is bit 2):
+
+```c
+void pmic_set_aldo3(bool on) {
+  uint8_t cfg0 = i2c_read_reg(ADDR, REG_LDO_ONOFF_CFG0);
+  if (on) cfg0 |=  (1 << 2);
+  else    cfg0 &= ~(1 << 2);
+  i2c_write_reg(ADDR, REG_LDO_ONOFF_CFG0, cfg0);
+}
+```
+
+- [ ] **Step 4.3: Create `firmware-c6/src/hw/co5300.h`**
 
 ```c
 #pragma once
@@ -679,8 +705,8 @@ Add an attribution comment at the top of each file:
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
 
-// Initialize the CO5300 over QSPI.
-// Must be called AFTER pmic_init().
+// Initialize the CO5300 over QSPI (via the SH8601-compatible driver).
+// Must be called AFTER pmic_init() (needs ALDO3 / LCD rails up).
 // Returns true on success; populates panel handles in the OUT params.
 bool co5300_init(esp_lcd_panel_io_handle_t *io_out,
                  esp_lcd_panel_handle_t *panel_out);
@@ -689,30 +715,105 @@ bool co5300_init(esp_lcd_panel_io_handle_t *io_out,
 void co5300_set_brightness(esp_lcd_panel_io_handle_t io, uint8_t level);
 ```
 
-- [ ] **Step 4.3: Create `firmware-c6/src/hw/co5300.cpp`**
+- [ ] **Step 4.4: Create `firmware-c6/src/hw/co5300.cpp`**
+
+This is a clean rewrite of the Waveshare LCD bring-up (not the LVGL/touch parts). The init command array is copied verbatim from Waveshare's `lcd_init_cmds[]`.
 
 ```c
 #include "co5300.h"
 #include "pins.h"
+#include "pmic_axp2101.h"
+#include "co5300_vendor/esp_lcd_sh8601.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_vendor.h"
 #include "driver/spi_master.h"
+#include "driver/gpio.h"
 
-// Forward-declare into the vendored file. The vendored TU defines an
-// init function that does the SPI bus + panel_io + custom-init-sequence
-// setup. We expose a thin wrapper here so callers don't include vendored
-// headers directly.
-extern "C" {
-bool waveshare_co5300_bring_up(esp_lcd_panel_io_handle_t *io_out,
-                               esp_lcd_panel_handle_t *panel_out);
+#define LCD_HOST  SPI2_HOST
+
+// CO5300 init command array — copied verbatim from Waveshare's
+// 08_LVGL_V8_Test/bsp_lvgl_port.cpp (lcd_init_cmds[]). Panel-specific magic;
+// do not edit. 0x2A/0x2B set the 0..479 column/row window (0x01DF = 479).
+static const sh8601_lcd_init_cmd_t lcd_init_cmds[] = {
+  { 0x11, (uint8_t[]){ 0x00 }, 0, 600 },
+  { 0xFE, (uint8_t[]){ 0x20 }, 1, 0 },
+  { 0x19, (uint8_t[]){ 0x10 }, 1, 0 },
+  { 0x1C, (uint8_t[]){ 0xA0 }, 1, 0 },
+  { 0xFE, (uint8_t[]){ 0x00 }, 1, 0 },
+  { 0xC4, (uint8_t[]){ 0x80 }, 1, 0 },
+  { 0x3A, (uint8_t[]){ 0x55 }, 1, 0 },
+  { 0x35, (uint8_t[]){ 0x00 }, 1, 0 },
+  { 0x36, (uint8_t[]){ 0x30 }, 1, 0 },
+  { 0x53, (uint8_t[]){ 0x20 }, 1, 0 },
+  { 0x51, (uint8_t[]){ 0xFF }, 1, 0 },
+  { 0x63, (uint8_t[]){ 0xFF }, 1, 0 },
+  { 0x2A, (uint8_t[]){ 0x00, 0x00, 0x01, 0xDF }, 4, 0 },
+  { 0x2B, (uint8_t[]){ 0x00, 0x00, 0x01, 0xDF }, 4, 0 },
+  { 0x29, (uint8_t[]){ 0x00 }, 0, 100 },
+};
+
+static void co5300_reset_pulse() {
+  // Waveshare DisplayPort_DispReset(): ALDO3 1 -> 0 -> 1, 100ms each.
+  pmic_set_aldo3(true);  delay(100);
+  pmic_set_aldo3(false); delay(100);
+  pmic_set_aldo3(true);  delay(100);
 }
 
 bool co5300_init(esp_lcd_panel_io_handle_t *io_out,
                  esp_lcd_panel_handle_t *panel_out) {
-  if (!waveshare_co5300_bring_up(io_out, panel_out)) {
-    Serial.println("CO5300: bring_up failed");
+  spi_bus_config_t buscfg = {};
+  buscfg.sclk_io_num = PIN_LCD_SCLK;
+  buscfg.data0_io_num = PIN_LCD_D0;
+  buscfg.data1_io_num = PIN_LCD_D1;
+  buscfg.data2_io_num = PIN_LCD_D2;
+  buscfg.data3_io_num = PIN_LCD_D3;
+  buscfg.max_transfer_sz = LCD_H_RES * LCD_V_RES * LCD_BITS_PP / 8;
+  if (spi_bus_initialize(LCD_HOST, &buscfg, SPI_DMA_CH_AUTO) != ESP_OK) {
+    Serial.println("CO5300: spi_bus_initialize failed");
     return false;
   }
+
+  esp_lcd_panel_io_handle_t io = nullptr;
+  esp_lcd_panel_io_spi_config_t io_config = {};
+  io_config.cs_gpio_num = PIN_LCD_CS;
+  io_config.dc_gpio_num = -1;
+  io_config.spi_mode = 0;
+  io_config.pclk_hz = 40 * 1000 * 1000;
+  io_config.trans_queue_depth = 2;
+  io_config.lcd_cmd_bits = 32;
+  io_config.lcd_param_bits = 8;
+  io_config.flags.quad_mode = true;
+  if (esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST,
+                               &io_config, &io) != ESP_OK) {
+    Serial.println("CO5300: new_panel_io_spi failed");
+    return false;
+  }
+
+  sh8601_vendor_config_t vendor_config = {};
+  vendor_config.init_cmds = lcd_init_cmds;
+  vendor_config.init_cmds_size = sizeof(lcd_init_cmds) / sizeof(lcd_init_cmds[0]);
+  vendor_config.flags.use_qspi_interface = 1;
+
+  esp_lcd_panel_handle_t panel = nullptr;
+  esp_lcd_panel_dev_config_t panel_config = {};
+  panel_config.reset_gpio_num = -1;   // no GPIO reset; ALDO3 handles it
+  panel_config.rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB;
+  panel_config.bits_per_pixel = LCD_BITS_PP;
+  panel_config.vendor_config = &vendor_config;
+  if (esp_lcd_new_panel_sh8601(io, &panel_config, &panel) != ESP_OK) {
+    Serial.println("CO5300: new_panel_sh8601 failed");
+    return false;
+  }
+
+  co5300_reset_pulse();
+
+  if (esp_lcd_panel_init(panel) != ESP_OK) {
+    Serial.println("CO5300: panel_init failed");
+    return false;
+  }
+
+  *io_out = io;
+  *panel_out = panel;
   Serial.println("CO5300: init OK");
   return true;
 }
@@ -724,9 +825,7 @@ void co5300_set_brightness(esp_lcd_panel_io_handle_t io, uint8_t level) {
 }
 ```
 
-**Wrap the vendored upstream function:** in `firmware-c6/src/hw/co5300_vendor/bsp_lvgl_port.cpp`, find the existing initialization function (it will be named something like `bsp_lvgl_init` or `Lcd_Init`). At the bottom of that file, add an extern "C" wrapper that calls the existing init internals but stops before the LVGL part — we only want the LCD bring-up here. **Read the vendored file carefully** and identify the section between "SPI bus config" and "before lvgl_init" — extract that into a function named `waveshare_co5300_bring_up`. If the vendored code does it all in one function, copy the upper portion (everything before `lv_init()`) into the new function.
-
-If this proves fiddly (the upstream code is tangled), the simpler alternative is to **leave the vendored file structure as-is, call its main init from co5300.cpp, and accept that LVGL gets initialized one task earlier than planned.** Note this deviation in the commit message; subsequent tasks adapt.
+> **Include-path note:** `co5300.cpp` lives in `src/hw/`, so it reaches the vendored driver with `"co5300_vendor/esp_lcd_sh8601.h"` and its peers with bare names (`"pins.h"`, `"pmic_axp2101.h"`). The vendored `.c` is compiled automatically by Arduino because it's under `src/`.
 
 - [ ] **Step 4.4: Solid-color test in `firmware-c6.ino`**
 
@@ -790,10 +889,11 @@ void loop() {
 - Colors look saturated (an AMOLED red is genuinely red; if it looks blue-tinted, byte order may be wrong)
 
 Common problems & fixes:
-- **Wrong colors** (red shows as blue): byte-swap. Either swap bytes in the panel config or use `__builtin_bswap16(color)`. Look for an `rgb_order` or `swap_bytes` flag in the vendored init code.
-- **Shifted / scrolling image**: wrong `offset_x` / `offset_y` or wrong column/row range in `esp_lcd_panel_set_gap`.
-- **Garbled stripes**: QSPI clock too high. Drop from 80MHz to 40MHz.
-- **Black screen**: revisit `esp_lcd_panel_disp_on_off(panel, true)` and `co5300_set_brightness(io, 200)` and the DCS 0x29 (display on) command in the init sequence.
+- **Black screen**: most likely the ALDO3 reset pulse. Confirm `co5300_reset_pulse()` runs (add a `Serial.println` in it). Also confirm `esp_lcd_panel_disp_on_off(panel, true)` is called and `co5300_set_brightness(io, 200)` ran. The init array's final `0x29` is display-on; the `0x51`=0xFF is brightness — both are in `lcd_init_cmds[]`.
+- **Wrong colors** (red shows as blue): byte-swap. Try `__builtin_bswap16(color)` in `fill_color`, OR change `panel_config.rgb_ele_order` to `LCD_RGB_ELEMENT_ORDER_BGR`. (Waveshare uses RGB + their own LVGL color settings, so a swap may be needed for raw `esp_lcd_panel_draw_bitmap` writes.)
+- **Shifted / scrolling image**: the `0x2A`/`0x2B` window in `lcd_init_cmds[]` is `0x00,0x00,0x01,0xDF` = columns/rows 0..479. Some CO5300 panels have a column offset (e.g. start at 0x06). If shifted horizontally, try `esp_lcd_panel_set_gap(panel, 6, 0)`.
+- **Garbled stripes**: QSPI clock too high. Drop `io_config.pclk_hz` from 40MHz to 20MHz.
+- **`spi_bus_initialize failed`**: SPI2_HOST already initialized. Shouldn't happen on a clean boot, but if iterating, a full power-cycle (unplug USB) clears it.
 
 Also note the free heap printed — it should be ≥ 320KB at this point. Record the number; subsequent tasks consume heap.
 
