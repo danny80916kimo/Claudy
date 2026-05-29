@@ -6,4 +6,5 @@ profiles:
     platforms:
       - platform: esp32:esp32 (3.0.7)
     libraries:
+      - lvgl (8.3.11)
       - ArduinoJson (7.1.0)
