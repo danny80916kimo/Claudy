@@ -1192,20 +1192,26 @@ git commit -m "firmware-c6: LVGL hello world; G4 passes (partial buf 2x46KB)"
 
 - [ ] **Step 6.1: Decide mascot canvas size based on Task 5 free-heap reading**
 
+> **DECIDED (G4 measured):** Free heap after UI init = **293,284 bytes** — but that is BEFORE WiFi. WiFi 6 / lwIP (Task 9) will consume ~50–80KB later, so the canvas must be sized for the post-WiFi budget, not this number. Reserve ~80KB for WiFi + 30KB headroom = 110KB. That leaves ~183KB → **use 400×240 (192KB canvas), MASCOT_X = 40.** The mascot art is only ~176×144px, so a 400-wide canvas (40px side margins) is visually identical to full-width. The full 480×240 (230KB) was rejected: it would leave ~63KB now → near-zero after WiFi → crash risk at G7/soak.
+
+The original (pre-WiFi-aware) table, kept for reference:
+
 | Free heap after UI init | Mascot canvas size | Buffer size |
 |---|---|---|
 | ≥ 290 KB | 480×240 | 230 KB |
 | 230..290 KB | 400×240 | 188 KB |
 | < 230 KB | 360×240 | 172 KB |
 
-In `firmware-c6/src/ui/theme.h`, set `MASCOT_W` and `MASCOT_H` to match. The mascot is centered within the upper half automatically by the layout (we set `MASCOT_X` to `(LCD_W - MASCOT_W) / 2`).
-
-If you picked smaller, also update `MASCOT_X`:
+Set in `firmware-c6/src/ui/theme.h`:
 
 ```c
 constexpr int MASCOT_W = 400;
-constexpr int MASCOT_X = (480 - 400) / 2;   // = 40
+constexpr int MASCOT_X = (480 - 400) / 2;   // = 40 (centered; art is centered within)
+constexpr int MASCOT_Y = 0;
+constexpr int MASCOT_H = 240;
 ```
+
+**Watch point at G7 (WiFi up):** if `Free heap after setup` drops below 30KB, shrink to 360×240 (172KB) — a one-line change + reflash.
 
 - [ ] **Step 6.2: Create `firmware-c6/src/ui/gfx.h`**
 
