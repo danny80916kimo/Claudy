@@ -51,6 +51,13 @@ bool pmic_init() {
   return true;
 }
 
+void pmic_set_aldo3(bool on) {
+  uint8_t cfg0 = i2c_read_reg(ADDR, REG_LDO_ONOFF_CFG0);
+  if (on) cfg0 |=  (1 << 2);
+  else    cfg0 &= ~(1 << 2);
+  i2c_write_reg(ADDR, REG_LDO_ONOFF_CFG0, cfg0);
+}
+
 void pmic_set_brightness(uint8_t level) {
   // CO5300 brightness is driven via DSI brightness command; here we keep
   // AXP at fixed 3.3V/1.8V and route brightness through the LCD command.

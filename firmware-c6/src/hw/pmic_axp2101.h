@@ -5,6 +5,9 @@
 // Must be initialized before any LCD or touch I/O.
 bool pmic_init();
 
+// Drive ALDO3 (the LCD VCI rail) on/off. Used for the CO5300 reset pulse.
+void pmic_set_aldo3(bool on);
+
 // AMOLED brightness 0..100. Stub for now — real brightness is driven by the
 // CO5300 via DCS 0x51 (see co5300_set_brightness in Task 4). This entry point
 // exists so callers can stay PMIC-flavored if a future variant routes
