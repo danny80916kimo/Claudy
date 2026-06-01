@@ -1,5 +1,7 @@
 #include <Arduino.h>
+#include <WiFi.h>
 #include "lvgl.h"
+#include "config.h"
 #include "state.h"
 #include "src/hw/i2c_bus.h"
 #include "src/hw/pmic_axp2101.h"
@@ -9,6 +11,7 @@
 #include "src/ui/lvgl_port.h"
 #include "src/ui/ui.h"
 #include "src/ui/theme.h"
+#include "src/net/net.h"
 
 AppState g_state;
 esp_lcd_panel_io_handle_t g_io;
@@ -20,62 +23,68 @@ void setup() {
   Serial.println("\n=== Claudy-C6 boot ===");
 
   i2c_bus_begin();
-  if (!pmic_init()) while (true) delay(1000);
+  if (!pmic_init())                              while (true) delay(1000);
   delay(100);
-  if (!co5300_init(&g_io, &g_panel)) while (true) delay(1000);
+  if (!co5300_init(&g_io, &g_panel))             while (true) delay(1000);
   esp_lcd_panel_disp_on_off(g_panel, true);
-  co5300_set_brightness(g_io, 200);
+  co5300_set_brightness(g_io, BRIGHTNESS * 255 / 100);
 
-  if (!lvgl_port_init(g_io, g_panel)) while (true) delay(1000);
+  if (!lvgl_port_init(g_io, g_panel))            while (true) delay(1000);
   touch_init();
 
   if (lvgl_port_lock(200)) {
     ui_init();
-    g_state.state = STATE_IDLE;
-    g_state.tool = TOOL_NONE;
-    strncpy(g_state.message, "Idle", sizeof(g_state.message));
-    g_state.tokensUsed = 12345;
-    g_state.tokensMax = 200000;
+    g_state.state = STATE_BOOT;
+    strncpy(g_state.message, "Connecting WiFi...", sizeof(g_state.message));
     ui_apply_state();
     lvgl_port_unlock();
   }
-}
 
-const MascotState CYCLE[] = {
-  STATE_IDLE, STATE_THINKING, STATE_WORKING, STATE_WAITING, STATE_ERROR, STATE_DONE
-};
-const ToolIcon CYCLE_TOOLS[] = {
-  TOOL_NONE, TOOL_NONE, TOOL_EDIT, TOOL_NONE, TOOL_BASH, TOOL_NONE
-};
-const char *CYCLE_MSGS[] = {
-  "Idle",
-  "Reading your prompt...",
-  "Editing firmware-c6/src/ui/ui.cpp",
-  "Approve write to /etc/hosts?",
-  "Bash failed: exit 1",
-  "完成 — 3 個檔案已更新",
-};
-
-uint8_t cyc = 0;
-uint32_t last_change = 0;
-
-void loop() {
-  if (millis() - last_change > 3000) {
-    last_change = millis();
-    if (lvgl_port_lock(100)) {
-      g_state.state = CYCLE[cyc];
-      g_state.tool  = CYCLE_TOOLS[cyc];
-      strncpy(g_state.message, CYCLE_MSGS[cyc], sizeof(g_state.message));
-      g_state.tokensUsed += 8000;
-      if (g_state.tokensUsed > g_state.tokensMax) g_state.tokensUsed = 12345;
+  if (netBegin()) {
+    if (lvgl_port_lock(200)) {
+      g_state.state = STATE_IDLE;
+      snprintf(g_state.message, sizeof(g_state.message),
+               "%s.local  %s", MDNS_HOSTNAME, WiFi.localIP().toString().c_str());
       ui_apply_state();
       lvgl_port_unlock();
     }
-    cyc = (cyc + 1) % 6;
+  } else {
+    if (lvgl_port_lock(200)) {
+      g_state.state = STATE_ERROR;
+      strncpy(g_state.message, "WiFi failed. Check config.h", sizeof(g_state.message));
+      ui_apply_state();
+      lvgl_port_unlock();
+    }
+  }
+
+  Serial.printf("Free heap after setup: %u bytes\n", ESP.getFreeHeap());
+}
+
+void loop() {
+  netLoop();
+
+  // Idle timeout
+  if (IDLE_TIMEOUT_MS > 0 &&
+      g_state.state != STATE_IDLE &&
+      g_state.state != STATE_BOOT &&
+      g_state.state != STATE_ERROR &&
+      g_state.lastUpdateMs > 0 &&
+      millis() - g_state.lastUpdateMs > IDLE_TIMEOUT_MS) {
+    if (lvgl_port_lock(100)) {
+      g_state.state = STATE_IDLE;
+      g_state.tool = TOOL_NONE;
+      strncpy(g_state.message, "Idle", sizeof(g_state.message));
+      ui_apply_state();
+      lvgl_port_unlock();
+    }
   }
 
   uint16_t tx, ty;
-  if (touch_read(&tx, &ty)) Serial.printf("touch: %u,%u\n", tx, ty);
+  if (touch_read(&tx, &ty)) {
+    // Tap-to-wake: cancel idle by refreshing lastUpdateMs and bumping brightness.
+    co5300_set_brightness(g_io, BRIGHTNESS * 255 / 100);
+    g_state.lastUpdateMs = millis();
+  }
 
   delay(lvgl_port_tick());
 }
