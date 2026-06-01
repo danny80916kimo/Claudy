@@ -21,3 +21,10 @@
 
 // Auto-return to IDLE after this many ms of no updates (0 = never)
 #define IDLE_TIMEOUT_MS 60000
+
+// Transport: define exactly ONE. BLE is for the battery-powered C6 with no WiFi.
+// #define CLAUDY_TRANSPORT_WIFI
+#define CLAUDY_TRANSPORT_BLE
+
+// BLE advertised device name (must match CLAUDY_BLE_NAME in the Mac daemon).
+#define BLE_DEVICE_NAME  "claudy"

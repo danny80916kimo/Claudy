@@ -1,3 +1,5 @@
+#include "../../config.h"
+#ifdef CLAUDY_TRANSPORT_WIFI
 #include "net.h"
 #include "../../state.h"
 #include "../ui/ui.h"
@@ -136,3 +138,5 @@ void netLoop() {
 bool netIsConnected() {
   return s_connected && WiFi.status() == WL_CONNECTED;
 }
+
+#endif // CLAUDY_TRANSPORT_WIFI

@@ -1,7 +1,9 @@
 #include <Arduino.h>
-#include <WiFi.h>
-#include "lvgl.h"
 #include "config.h"
+#ifdef CLAUDY_TRANSPORT_WIFI
+#include <WiFi.h>
+#endif
+#include "lvgl.h"
 #include "state.h"
 #include "src/hw/i2c_bus.h"
 #include "src/hw/pmic_axp2101.h"
@@ -40,6 +42,7 @@ void setup() {
     lvgl_port_unlock();
   }
 
+#ifdef CLAUDY_TRANSPORT_WIFI
   if (netBegin()) {
     if (lvgl_port_lock(200)) {
       g_state.state = STATE_IDLE;
@@ -56,12 +59,15 @@ void setup() {
       lvgl_port_unlock();
     }
   }
+#endif
 
   Serial.printf("Free heap after setup: %u bytes\n", ESP.getFreeHeap());
 }
 
 void loop() {
+#ifdef CLAUDY_TRANSPORT_WIFI
   netLoop();
+#endif
 
   // Idle timeout
   if (IDLE_TIMEOUT_MS > 0 &&
