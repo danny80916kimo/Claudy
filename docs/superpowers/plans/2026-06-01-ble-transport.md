@@ -209,10 +209,10 @@ In `firmware-c6/sketch.yaml`, add to the `libraries:` list so it reads:
     libraries:
       - lvgl (8.3.11)
       - ArduinoJson (7.1.0)
-      - NimBLE-Arduino (2.2.3)
+      - NimBLE-Arduino (2.3.4)
 ```
 
-(If `arduino-cli` reports 2.2.3 unavailable, use the latest 2.x it lists: `arduino-cli lib search NimBLE-Arduino`. Pin whatever 2.x version resolves and note it in the commit.)
+> **Version pinned to 2.3.4 (verified on hardware target).** NimBLE-Arduino 2.0.x–2.2.x do NOT compile on the ESP32-C6 with arduino-esp32 3.0.7 (IDF 5.1): their manual `esp_bt_controller_config_t` init sets `.mode`/`.ble_max_conn`, which don't exist in the IDF-5.1 C6 controller struct (it uses `.nimble_max_connections`), and `CONFIG_NIMBLE_CPP_IDF` isn't defined in Arduino builds so the broken path is always taken. 2.3.4 fixes this for the Arduino/IDF-5.1 path and builds with no extra flags. Use 2.3.4 (or newer 2.3.x).
 
 - [ ] **Step 2.2: Create `firmware-c6/src/net/ble.h`**
 
