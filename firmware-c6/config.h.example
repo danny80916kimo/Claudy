@@ -28,3 +28,8 @@
 
 // BLE advertised device name (must match CLAUDY_BLE_NAME in the Mac daemon).
 #define BLE_DEVICE_NAME  "claudy"
+
+// Exactly one transport must be selected.
+#if defined(CLAUDY_TRANSPORT_WIFI) == defined(CLAUDY_TRANSPORT_BLE)
+#error "Define exactly one of CLAUDY_TRANSPORT_WIFI / CLAUDY_TRANSPORT_BLE in config.h"
+#endif

@@ -2,7 +2,7 @@
 #include "config.h"
 #ifdef CLAUDY_TRANSPORT_WIFI
 #include <WiFi.h>
-#endif
+#endif // CLAUDY_TRANSPORT_WIFI
 #include "lvgl.h"
 #include "state.h"
 #include "src/hw/i2c_bus.h"
@@ -37,7 +37,7 @@ void setup() {
   if (lvgl_port_lock(200)) {
     ui_init();
     g_state.state = STATE_BOOT;
-    strncpy(g_state.message, "Connecting WiFi...", sizeof(g_state.message));
+    strncpy(g_state.message, "Starting...", sizeof(g_state.message));
     ui_apply_state();
     lvgl_port_unlock();
   }
@@ -59,7 +59,7 @@ void setup() {
       lvgl_port_unlock();
     }
   }
-#endif
+#endif // CLAUDY_TRANSPORT_WIFI
 
   Serial.printf("Free heap after setup: %u bytes\n", ESP.getFreeHeap());
 }
@@ -67,7 +67,7 @@ void setup() {
 void loop() {
 #ifdef CLAUDY_TRANSPORT_WIFI
   netLoop();
-#endif
+#endif // CLAUDY_TRANSPORT_WIFI
 
   // Idle timeout
   if (IDLE_TIMEOUT_MS > 0 &&
