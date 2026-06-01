@@ -14,6 +14,9 @@
 #include "src/ui/ui.h"
 #include "src/ui/theme.h"
 #include "src/net/net.h"
+#ifdef CLAUDY_TRANSPORT_BLE
+#include "src/net/ble.h"
+#endif
 
 AppState g_state;
 esp_lcd_panel_io_handle_t g_io;
@@ -60,6 +63,16 @@ void setup() {
     }
   }
 #endif // CLAUDY_TRANSPORT_WIFI
+
+#ifdef CLAUDY_TRANSPORT_BLE
+  bleBegin();
+  if (lvgl_port_lock(200)) {
+    g_state.state = STATE_IDLE;
+    strncpy(g_state.message, "Bluetooth ready", sizeof(g_state.message));
+    ui_apply_state();
+    lvgl_port_unlock();
+  }
+#endif
 
   Serial.printf("Free heap after setup: %u bytes\n", ESP.getFreeHeap());
 }
