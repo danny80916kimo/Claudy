@@ -71,13 +71,13 @@ void ui_init() {
   lv_obj_set_style_text_color(s_state_label, lv_color_white(), 0);
   lv_obj_set_pos(s_state_label, INFO_X, STATE_Y);
 
-  // Token percentage — same row as the state name, right-aligned
+  // Token percentage — bottom-right, beside the context bar
   s_bar_pct_label = lv_label_create(scr);
   lv_obj_set_style_text_font(s_bar_pct_label, &lv_font_montserrat_28, 0);
   lv_obj_set_style_text_color(s_bar_pct_label, lv_color_white(), 0);
   lv_obj_set_width(s_bar_pct_label, PCT_W);
   lv_obj_set_style_text_align(s_bar_pct_label, LV_TEXT_ALIGN_RIGHT, 0);
-  lv_obj_set_pos(s_bar_pct_label, INFO_X + INFO_W - PCT_W, STATE_Y);
+  lv_obj_set_pos(s_bar_pct_label, INFO_X + INFO_W - PCT_W, BAR_Y - 8);
   lv_label_set_text(s_bar_pct_label, "");
 
   // Tool chip
@@ -120,11 +120,11 @@ void ui_init() {
   lv_obj_set_style_bg_color(s_bar, rgb565_to_lv(0x4A49), LV_PART_MAIN);
   lv_obj_set_style_bg_color(s_bar, rgb565_to_lv(COL_BAR_OK), LV_PART_INDICATOR);
 
-  // "Nk / Nk" detail — right of the bar, same row
+  // "Nk / Nk" detail — small, above the bar (left)
   s_bar_detail_label = lv_label_create(scr);
   lv_obj_set_style_text_font(s_bar_detail_label, &lv_font_montserrat_16, 0);
   lv_obj_set_style_text_color(s_bar_detail_label, rgb565_to_lv(0x8C71), 0);
-  lv_obj_set_pos(s_bar_detail_label, INFO_X + BAR_W + 12, BAR_Y - 4);
+  lv_obj_set_pos(s_bar_detail_label, INFO_X, BAR_Y - 24);
   lv_label_set_text(s_bar_detail_label, "");
 }
 

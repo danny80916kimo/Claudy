@@ -21,10 +21,10 @@ constexpr int TOOL_Y   = 292;       // tool chip + tool name
 constexpr int CHIP_W   = 36;
 constexpr int CHIP_H   = 28;
 constexpr int MSG_Y    = 330;       // message: 24px CJK, up to 2 lines
-constexpr int PCT_W    = 130;       // token % label (right-aligned in the state row)
+constexpr int PCT_W    = 130;       // token % label (right-aligned beside the bar)
 constexpr int BAR_Y    = 446;
 constexpr int BAR_H    = 16;
-constexpr int BAR_W    = 280;       // bar width; "Nk / Nk" detail sits to its right
+constexpr int BAR_W    = 298;       // bar width; big % sits to its right, detail above
 
 // RGB565 palette (same constants as firmware/mascot.cpp + display.cpp)
 constexpr uint16_t COL_BG       = 0x0000;   // black
